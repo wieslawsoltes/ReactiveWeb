@@ -1,0 +1,132 @@
+name: CI and distribution
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:package
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Record benchmark observations
+        if: matrix.node == 24
+        run: npm run benchmark > benchmark.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-node-${{ matrix.node }}
+          path: |
+            test-results/
+            benchmark.json
+          if-no-files-found: ignore
+
+  package:
+    needs: verify
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build:demo
+      - run: npm pack --ignore-scripts
+      - name: Archive standalone modules and demo
+        run: |
+          tar -czf reactiveweb-browser.tar.gz -C dist .
+          tar -czf reactiveweb-showcase.tar.gz -C site .
+          sha256sum *.tgz *.tar.gz > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distribution
+          path: |
+            *.tgz
+            *.tar.gz
+            SHA256SUMS.txt
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  pages:
+    needs: package
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy showcase
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  release:
+    needs: package
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: distribution
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@wieslawsoltes'
+      - name: Publish GitHub package if version is new
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          package_name=$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).name')
+          package_version=$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')
+          if npm view "$package_name@$package_version" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "Package version already published."
+          else
+            packages=( *.tgz )
+            npm publish "${packages[0]}" --registry=https://npm.pkg.github.com --provenance=false --ignore-scripts
+          fi
+      - name: Publish versioned release and assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          package_version=$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')
+          release_tag="v$package_version"
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            echo "Release already exists; immutable assets retained."
+          else
+            gh release create "$release_tag" --target "$GITHUB_SHA" --title "ReactiveWeb $package_version" --notes-file docs/release-notes.md *.tgz *.tar.gz SHA256SUMS.txt
+          fi

@@ -1,0 +1,12 @@
+import { build } from 'esbuild';
+import { mkdir, readdir, writeFile, copyFile } from 'node:fs/promises';
+await mkdir('dist', { recursive: true });
+const entries = (await readdir('src')).filter(file => file.endsWith('.ts')).map(file => 'src/' + file);
+await build({ entryPoints: entries, outdir: 'dist/cjs', bundle: false, platform: 'node', format: 'cjs', target: 'es2022', sourcemap: true });
+await writeFile('dist/cjs/package.json', JSON.stringify({type:'commonjs'}));
+await mkdir('dist/third-party', { recursive:true });
+await copyFile('node_modules/rxjs/LICENSE.txt','dist/third-party/RXJS-LICENSE.txt');
+await copyFile('LICENSE', 'dist/LICENSE');
+await copyFile('NOTICE', 'dist/NOTICE');
+await build({ entryPoints: { 'reactiveweb.browser':'src/browser.ts', 'reactiveweb-html.browser':'src/html.ts' }, outdir:'dist', bundle: true, splitting:true, chunkNames:'browser-chunks/[name]-[hash]', platform: 'browser', format: 'esm', target: 'es2022', minify: true, sourcemap: true });
+console.log('Built ESM, CommonJS, declarations and standalone browser modules.');

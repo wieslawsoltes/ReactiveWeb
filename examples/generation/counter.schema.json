@@ -1,0 +1,18 @@
+{
+  "className": "CounterViewModel",
+  "imports": {
+    "doubleCount": "./counter-logic.js",
+    "increment": "./counter-logic.js",
+    "canIncrement": "./counter-logic.js"
+  },
+  "properties": {
+    "Name": { "type": "string", "initial": "Generated counter", "validate": { "required": true, "maxLength": 80 } },
+    "Count": { "type": "number", "initial": 0, "validate": { "minimum": 0, "maximum": 1000 } }
+  },
+  "computed": {
+    "Double": { "source": "doubleCount", "type": "number", "initialValue": 0 }
+  },
+  "commands": {
+    "Increment": { "execute": "increment", "canExecute": "canIncrement", "inputType": "void", "outputType": "number" }
+  }
+}

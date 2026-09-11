@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Explore ReactiveWeb: RxJS-powered view models, commands, bindings and web components with a familiar .NET API.">
+  <title>ReactiveWeb · Interactive workbench</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview"><span class="brand-icon">R<span>↗</span></span><span>ReactiveWeb<small>THE RXJS MVVM TOOLKIT</small></span></a>
+      <div class="nav-title">INTERACTIVE WORKBENCH</div>
+      <nav id="navigation" aria-label="Feature examples"></nav>
+      <div class="sidebar-bottom"><span class="version">0.1.0</span><span>JavaScript. Familiar patterns.</span><a href="https://github.com/wieslawsoltes/ReactiveWeb" target="_blank" rel="noreferrer">Source on GitHub ↗</a></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><div><span class="crumb">Workbench</span><span class="slash">/</span><span id="breadcrumb">Overview</span></div><div class="toolbar"><span class="runtime"><i></i> RxJS 7.8</span><button id="theme-toggle" class="icon-button" aria-label="Switch color theme">◐</button><a class="github-link" href="https://github.com/wieslawsoltes/ReactiveWeb#readme" target="_blank" rel="noreferrer">Documentation ↗</a></div></header>
+      <main>
+        <div class="page-heading"><div><div id="eyebrow" class="eyebrow">BUILD WITH OBSERVABLES</div><h1 id="page-title">State that connects.</h1><p id="page-description">Edit a view model. Follow the change from property to command to view.</p></div><span class="pill">LIVE EXAMPLES</span></div>
+        <div class="feature-strip"><div><span class="strip-number">01</span><div><strong>Familiar APIs</strong><small>ReactiveObject · ReactiveCommand</small></div></div><div><span class="strip-number">02</span><div><strong>Native observables</strong><small>Powered by real RxJS streams</small></div></div><div><span class="strip-number">03</span><div><strong>Any web view</strong><small>HTML · Web Components · React</small></div></div></div>
+        <div class="workbench-grid"><section class="lab-panel"><div class="panel-heading"><div><span class="panel-dot"></span><h2 id="lab-title">Profile editor</h2></div><span class="panel-meta" id="lab-meta">TWO-WAY BINDING</span></div><div id="lab" class="lab-content"></div></section><aside class="inspector"><div class="panel-heading"><h2>View model</h2><span class="panel-meta">LIVE STATE</span></div><div class="inspector-path" id="model-name">ProfileViewModel</div><pre id="state" aria-label="Current view model state"></pre><div class="inspector-footer"><i></i> Updates from observable subscriptions</div></aside></div>
+        <section class="event-panel"><div class="panel-heading"><h2>Event stream <span id="event-count" class="count">0</span></h2><button class="text-button" id="clear-events">Clear stream</button></div><div class="event-table-header"><span>TIME</span><span>EVENT</span><span>VALUE</span></div><div id="events" role="log" aria-live="polite"></div></section>
+        <details class="source-panel"><summary><span>Explore the code</span><span class="panel-meta">TYPESCRIPT / JAVASCRIPT</span></summary><pre><code id="source-code"></code></pre></details>
+        <footer>Built with ReactiveWeb <span>Independent implementation · MIT licensed · RxJS powered</span></footer>
+      </main>
+    </div>
+  </div>
+  <dialog id="interaction-dialog"><form method="dialog"><span class="eyebrow">INTERACTION REQUEST</span><h2 id="dialog-title">Confirm action</h2><p id="dialog-message"></p><div class="button-row"><button value="cancel" class="secondary">Cancel</button><button value="confirm" class="primary">Confirm</button></div></form></dialog>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

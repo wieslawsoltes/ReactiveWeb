@@ -1,0 +1,12 @@
+node_modules/
+dist/
+site/
+coverage/
+test-results/
+.test/
+.command-test/
+.generation-compile-*/
+playwright-report/
+.sites-runtime/
+*.tgz
+.DS_Store

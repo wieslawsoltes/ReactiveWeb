@@ -1,0 +1,15 @@
+import { build } from 'esbuild';
+import { mkdir, copyFile, writeFile } from 'node:fs/promises';
+await mkdir('site', { recursive: true });
+await build({ entryPoints: ['demo/main.ts'], outfile: 'site/app.js', bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true, sourcemap: true });
+await copyFile('demo/index.html', 'site/index.html');
+await copyFile('demo/style.css', 'site/style.css');
+await copyFile('demo/favicon.svg', 'site/favicon.svg');
+await mkdir('site/licenses', { recursive:true });
+await copyFile('node_modules/rxjs/LICENSE.txt','site/licenses/RXJS-LICENSE.txt');
+await copyFile('node_modules/react/LICENSE','site/licenses/REACT-LICENSE.txt');
+await copyFile('node_modules/react-dom/LICENSE','site/licenses/REACT-DOM-LICENSE.txt');
+await copyFile('LICENSE', 'site/LICENSE');
+await copyFile('NOTICE', 'site/NOTICE');
+await writeFile('site/.nojekyll', '');
+console.log('Showcase built in site/ with relative URLs for GitHub Pages.');

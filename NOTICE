@@ -1,0 +1,19 @@
+ReactiveWeb is an independent JavaScript/TypeScript implementation informed by
+the MIT-licensed ReactiveUI public APIs and published implementation behavior.
+It is not an official ReactiveUI distribution and is not affiliated with its
+maintainers. The System.Reactive-compatible ReactiveUI.Reactive distribution is
+the reference; ReactiveWeb uses the actual RxJS library for its observable engine.
+
+Reference repositories and pinned revisions are recorded in docs/upstream-audit.md.
+ReactiveUI, ReactiveUI.SourceGenerators and ReactiveUI.Avalonia retain their
+respective names, copyrights and licenses. Copyright (c) .NET Foundation and
+Contributors. The MIT permission and disclaimer are reproduced in LICENSE.
+
+The standalone browser distribution bundles RxJS, Apache-2.0 licensed,
+Copyright (c) 2015-2018 Google, Inc., Netflix, Inc., Microsoft Corp. and contributors.
+The complete RxJS license is distributed at third-party/RXJS-LICENSE.txt within
+the browser archive, dist/third-party/RXJS-LICENSE.txt within the npm package,
+and licenses/RXJS-LICENSE.txt within the showcase.
+The showcase additionally bundles React and React DOM, MIT licensed,
+Copyright (c) Meta Platforms, Inc. and affiliates.
+Their licenses are included alongside the built showcase.
