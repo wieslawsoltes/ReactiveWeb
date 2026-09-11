@@ -33,7 +33,7 @@ jobs:
       - name: Record benchmark observations
         if: matrix.node == 24
         run: npm run benchmark > benchmark.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: verification-node-${{ matrix.node }}
@@ -61,7 +61,7 @@ jobs:
           tar -czf reactiveweb-browser.tar.gz -C dist .
           tar -czf reactiveweb-showcase.tar.gz -C site .
           sha256sum *.tgz *.tar.gz > SHA256SUMS.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: distribution
           path: |
