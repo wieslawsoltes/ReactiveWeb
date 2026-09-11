@@ -71,7 +71,7 @@ Unsubscribing from a Promise command requests cancellation through its signal. A
 | Declarative HTML | `BindHtml`, `data-rx-*` attributes, mutation observation | **Adapted.** Property-path-based HTML binding avoids runtime source evaluation; it is an additional browser API. |
 | `ViewModelViewHost` | Custom-element host resolving an HTML view factory | **Adapted.** Supports VM assignment, contracts, default content and disposal. |
 | `RoutedViewHost` | Custom-element host observing a routing VM stream | **Adapted.** DOM content replaces Avalonia transitioning content controls. |
-| `ViewLocator`, contracts | Explicit constructor/factory registrations and inheritance lookup | **Adapted.** Assembly scanning, generic CLR type resolution and reflection attributes are not used. |
+| `ViewLocator`, contracts | Explicit constructor/factory registrations and inheritance lookup | **Adapted.** Singleton registrations own cached views; hosts detach and reuse them until registration disposal. Assembly scanning, generic CLR type resolution and reflection attributes are not used. |
 | React integration | `useObservable`, `useReactiveObject`, `useWhenActivated`, `useReactiveCommand`, providers and view hosts in `./react` | **Adapted.** React is optional for the core and HTML packages. The command hook resolves the first result and unsubscribes; `executeAsync` on a core command resolves its final result. |
 | Avalonia styled properties, XAML, native controls | DOM properties, custom elements and framework components | **Native-specific.** Avalonia layout/rendering, XAML loading, native windows and platform routed events are not ported. |
 | WPF, WinForms, MAUI, UIKit, Android, Blazor native adapters | HTML/React counterparts | **Native-specific.** The existing native adapter packages are not executable in this JavaScript library. |
@@ -152,7 +152,10 @@ The repository includes tests for the JavaScript contract and integration checks
 | React external-store subscriptions, component lifetime and command hooks | [react.test.ts](../test/react.test.ts) |
 | Validation errors, pending work and obsolete-result cancellation | [validation.test.ts](../test/validation.test.ts) |
 | Runtime/decorator generation, disposal and generated TypeScript/CLI execution | [generation.test.ts](../test/generation.test.ts) |
+| Application setup, default restoration, property providers and converter registration | [builder.test.ts](../test/builder.test.ts) |
+| Typed/fallback/set-method conversion, affinity selection and binding hooks | [converters.test.ts](../test/converters.test.ts) |
+| Scheduled subjects, dispatcher fallback/readiness, logging and switching helpers | [extensions.test.ts](../test/extensions.test.ts) |
 
-Remaining broad compatibility work includes a complete declaration-level mapping across upstream target frameworks, differential upstream behavioral fixtures, the full conversion/provider/builder extension surface, Roslyn diagnostic equivalence, and native-only facilities that require explicit web alternatives. Production use also needs application-specific browser, accessibility, lifecycle/memory, storage and workload performance verification.
+Remaining broad compatibility work includes a complete declaration-level mapping across upstream target frameworks, differential upstream behavioral fixtures, upstream conversion/provider/builder overloads beyond the documented JavaScript registries, Roslyn diagnostic equivalence, and native-only facilities that require explicit web alternatives. Production use also needs application-specific browser, accessibility, lifecycle/memory, storage and workload performance verification.
 
 Do not calculate a parity percentage from this table: families vary substantially in size, and an implemented name is not proof of matching all overloads and semantics. Add a test and update this matrix whenever a previously partial behavior becomes supported.
