@@ -117,7 +117,7 @@ test('generated TypeScript compiles strictly and executes properties, computed v
     }, { moduleName: '../dist/index.js' });
     await writeFile(join(directory, 'generated.ts'), source);
     await writeFile(join(directory, 'factories.ts'), `import { map, of } from 'rxjs';\nimport type { GeneratedCounter } from './generated.js';\nexport const doubled = (vm: GeneratedCounter) => vm.WhenAnyValue<number>('Count').pipe(map(value => value * 2));\nexport const canAdd = (_vm: GeneratedCounter) => of(true);\nexport const add = async (vm: GeneratedCounter, input: number, signal: AbortSignal): Promise<number> => { if (signal.aborted) throw new Error('cancelled'); return vm.Count += input; };\n`);
-    const compile = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--skipLibCheck', join(directory, 'generated.ts'), join(directory, 'factories.ts')], { encoding: 'utf8' });
+    const compile = spawnSync(process.execPath, [resolve('node_modules/typescript/bin/tsc'), '--ignoreConfig', '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--skipLibCheck', join(directory, 'generated.ts'), join(directory, 'factories.ts')], { encoding: 'utf8' });
     assert.equal(compile.status, 0, compile.stdout + compile.stderr);
     const { GeneratedCounter } = await import(pathToFileURL(join(directory, 'generated.js')).href);
     const counter = new GeneratedCounter();
