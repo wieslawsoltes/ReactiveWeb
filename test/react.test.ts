@@ -4,10 +4,12 @@ import { createElement, StrictMode, act } from 'react';
 import { renderToString } from 'react-dom/server';
 import { createRoot } from 'react-dom/client';
 import { Window } from 'happy-dom';
-import { BehaviorSubject, Observable, of } from 'rxjs';
+import { BehaviorSubject, Observable, of, take } from 'rxjs';
 import { ReactiveObject } from '../dist/reactive-object.js';
+import { ObservableCollection } from '../dist/collections.js';
+import { SourceCache, SourceList, type ChangeSet } from '@wieslawsoltes/dynamicdataweb';
 import { ViewModelActivator, WhenActivated } from '../dist/activation.js';
-import { ReactiveProvider, useObservable, useReactiveObject, useWhenActivated, useViewModel, useReactiveCommand, RoutedViewHost } from '../dist/react.js';
+import { ReactiveProvider, useObservable, useReactiveObject, useWhenActivated, useViewModel, useReactiveCommand, RoutedViewHost, useReactiveCollection, useCollection } from '../dist/react.js';
 import { ViewLocator } from '../dist/services.js';
 import { ReactiveCommand } from '../dist/command.js';
 
@@ -97,4 +99,69 @@ test('React command invocation gates two calls made in the same turn', async () 
     resolve(1); assert.equal(await first, 1);
   });
   await act(async () => root.unmount()); command.Dispose();
+});
+
+
+test('useReactiveCollection SSR reads DynamicData Items without subscribing and accepts a server snapshot', () => {
+  const source = new SourceList(['one', 'two']); let subscribed = 0;
+  const connect = source.Connect.bind(source);
+  source.Connect = (...args) => { subscribed++; return connect(...args); };
+  function View() { return createElement('span', null, useReactiveCollection(source).join(',')); }
+  assert.equal(renderToString(createElement(View)), '<span>one,two</span>'); assert.equal(subscribed, 0);
+  const changes = new Observable<ChangeSet<string>>(() => { subscribed++; });
+  function ServerView() { return createElement('span', null, useCollection(changes, ['server']).join(',')); }
+  assert.equal(renderToString(createElement(ServerView)), '<span>server</span>'); assert.equal(subscribed, 0); source.Dispose();
+});
+
+test('useReactiveCollection observes DynamicData deltas with StrictMode cleanup and source replacement', async () => {
+  const first = new SourceList(['one']), second = new SourceList(['two']);
+  let active = 0, started = 0;
+  const wrap = (source: SourceList<string>) => new Observable<ChangeSet<string>>(subscriber => {
+    active++; started++; const subscription = source.Connect().subscribe(subscriber);
+    return () => { active--; subscription.unsubscribe(); };
+  });
+  const a = wrap(first), b = wrap(second); let snapshot: readonly string[] = [];
+  function View({ source }: { source: Observable<ChangeSet<string>> }) { snapshot = useReactiveCollection(source); return createElement('p', null, snapshot.join(',')); }
+  const container = window.document.createElement('div'); const root = createRoot(container as any);
+  await act(async () => root.render(createElement(StrictMode, null, createElement(View, { source: a }))));
+  assert.equal(active, 1); assert.ok(started >= 2); assert.equal(container.textContent, 'one'); assert.ok(Object.isFrozen(snapshot));
+  const previous = snapshot;
+  await act(async () => first.Add('added')); assert.equal(container.textContent, 'one,added'); assert.notEqual(snapshot, previous); assert.deepEqual(previous, ['one']);
+  await act(async () => root.render(createElement(StrictMode, null, createElement(View, { source: b }))));
+  assert.equal(active, 1); assert.equal(container.textContent, 'two');
+  await act(async () => first.Add('stale')); assert.equal(container.textContent, 'two');
+  await act(async () => second.Move(0, 0)); assert.equal(container.textContent, 'two');
+  await act(async () => root.unmount()); assert.equal(active, 0); assert.equal(first.isDisposed, false); first.Dispose(); second.Dispose();
+});
+
+test('useReactiveCollection caches snapshots between renders and refreshes mutable collection items', async () => {
+  const item = { Name: 'One' }; const collection = new ObservableCollection([item]);
+  let snapshot: readonly typeof item[] = []; let renders = 0;
+  function View() { renders++; snapshot = useReactiveCollection(collection); return createElement('p', null, snapshot.map(row => row.Name).join(',')); }
+  const container = window.document.createElement('div'); const root = createRoot(container as any);
+  await act(async () => root.render(createElement(View))); const initial = snapshot;
+  await act(async () => root.render(createElement(View))); assert.equal(snapshot, initial); assert.ok(renders < 10);
+  await act(async () => { item.Name = 'Changed'; collection.Refresh(item); });
+  assert.equal(container.textContent, 'Changed'); assert.notEqual(snapshot, initial);
+  await act(async () => root.unmount()); assert.equal(collection.IsDisposed, false); collection.Dispose();
+});
+
+
+test('useReactiveCollection treats an inline server snapshot as initial state for a stable source', async () => {
+  const source = new SourceList(['current']); let renders = 0;
+  function View() { renders++; return createElement('p', null, useReactiveCollection(source, ['server']).join(',')); }
+  const container = window.document.createElement('div'); const root = createRoot(container as any);
+  await act(async () => root.render(createElement(View)));
+  assert.equal(container.textContent, 'current'); assert.ok(renders < 10);
+  await act(async () => source.Add('added')); assert.equal(container.textContent, 'current,added'); assert.ok(renders < 10);
+  await act(async () => root.unmount()); source.Dispose();
+});
+
+
+test('useReactiveCollection retains the final snapshot of a synchronously completed change stream', async () => {
+  const source = new SourceList(['complete']); const changes = source.Connect().pipe(take(1));
+  function View() { return createElement('p', null, useReactiveCollection(changes).join(',')); }
+  const container = window.document.createElement('div'); const root = createRoot(container as any);
+  await act(async () => root.render(createElement(View))); assert.equal(container.textContent, 'complete');
+  await act(async () => root.unmount()); source.Dispose();
 });

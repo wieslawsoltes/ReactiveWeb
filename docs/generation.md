@@ -10,7 +10,7 @@ This is a web adaptation of the ReactiveUI.SourceGenerators workflow. It does no
 |---|---|---|
 | `@Reactive accessor Name = ''` | You already write TypeScript classes | TypeScript 5+ standard decorator transformation |
 | `defineViewModel({...})` | You want plain JavaScript or declarative view models | None beyond normal ESM/RxJS resolution |
-| `reactiveweb-generate schema.json --out model.ts` | You want explicit reviewable source committed to the repository | Node 20+ at generation time |
+| `reactiveweb-generate schema.json --out model.ts` | You want explicit reviewable source committed to the repository | Node 22+ at generation time |
 
 All view models expose .NET-style `GetValue`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `Changed`, `Changing`, and `Dispose`. Commands use `ReactiveCommand` and observable computed properties use `ToProperty`/`ObservableAsPropertyHelper`.
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.0
+
+Node-based consumers and build tools now require Node 22 or newer, matching the DynamicDataWeb dependency.
+
+- Integrate the published `@wieslawsoltes/dynamicdataweb` collection engine with
+  a shared RxJS peer and a dedicated `./dynamic-data` package entry.
+- Add native list/cache change-set bridges and transactional delta binding while
+  preserving the existing ObservableCollection change-record API.
+- Use DynamicData refresh/filter/sort pipelines for BindableDerivedList with
+  stable item subscriptions and observable filter/comparer criteria.
+- Support DynamicData sources in per-object resource ownership and collection
+  persistence, preserving duplicate-reference and cancellation semantics.
+- Add HTML BindCollection with retained row identity and React
+  useReactiveCollection/useCollection with stable snapshots and lifecycle cleanup.
+- Add a live cache workspace sharing filters, sort, paging, aggregates and item
+  edits between HTML and React views.
+- Serialize reentrant collection notifications and preserve initial/terminal
+  delivery ordering; extend package, lifecycle, UI and browser regression checks.
+- Verify both explicit npm distribution tags and install-index availability,
+  including a fresh anonymous package-name installation after publication.
+
 ## 0.1.1
 
 * Upgrade development dependencies, including TypeScript 7, React 19.2, Playwright

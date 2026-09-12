@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { BehaviorSubject, firstValueFrom, of } from 'rxjs';
 import { ReactiveObject } from '../dist/reactive-object.js';
+import { ObservableCollection } from '../dist/collections.js';
+import { SourceCache, SourceList } from '@wieslawsoltes/dynamicdataweb';
 import { ViewModelActivator, WhenActivated } from '../dist/activation.js';
 import { ViewLocator } from '../dist/services.js';
 import { Interaction } from '../dist/interaction.js';
 import { ConverterService, PropertyBindingHookRegistry } from '../dist/converters.js';
 const window = new Window();
 Object.assign(globalThis, { window, document: window.document, HTMLElement: window.HTMLElement, customElements: window.customElements, MutationObserver: window.MutationObserver });
-const { Bind, OneWayBind, BindCommand, BindHtml, BindingConverters, ReactiveElement, RoutedViewHost, BindInteraction } = await import('../dist/html.js');
+const { Bind, OneWayBind, BindCommand, BindHtml, BindingConverters, ReactiveElement, RoutedViewHost, BindInteraction, BindCollection } = await import('../dist/html.js');
 const document = window.document;
 
 test('two-way binding handles conversion, nested replacement, IME and disposal', () => {
@@ -172,4 +174,104 @@ test('singleton views survive route A to B to A and are disposed by registration
   const view = host.firstElementChild; assert.equal(view.Activator.IsActiveValue, true);
   host.remove(); assert.equal(view.Activator.IsActiveValue, false);
   registration.Dispose(); assert.throws(() => view.Activator.Activate(), /disposed/);
+});
+
+
+test('BindCollection preserves duplicate occurrence nodes through indexed moves and removals', () => {
+  const duplicate = { Name: 'same' }, other = { Name: 'other' };
+  const source = new SourceList([duplicate, duplicate, other]);
+  const target = document.createElement('ul'); let disposed = 0;
+  const binding = BindCollection(source, target as any, (item, index, lifetime) => {
+    const row = document.createElement('li'); row.textContent = item.Name;
+    lifetime.Add(() => disposed++); return row as any;
+  });
+  const [first, second, third] = [...target.children];
+  source.Move(1, 2);
+  assert.deepEqual([...target.children], [first, third, second]); assert.equal(disposed, 0);
+  source.RemoveAt(0);
+  assert.deepEqual([...target.children], [third, second]); assert.equal(disposed, 1);
+  source.Add({ Name: 'new' }); assert.equal(target.children[1], second);
+  binding.Dispose(); assert.equal(disposed, 4); assert.equal(target.childNodes.length, 0);
+  source.Add({ Name: 'after disposal' }); assert.equal(target.children.length, 0);
+  assert.equal(source.isDisposed, false); source.Dispose();
+});
+
+test('BindCollection retains keyed replacements and refreshes when an update callback is supplied', () => {
+  const source = new SourceCache<{ Id: number; Name: string }, number>(item => item.Id);
+  source.AddOrUpdate([{ Id: 1, Name: 'First' }, { Id: 2, Name: 'Second' }]);
+  const target = document.createElement('ul'); let disposed = 0;
+  const binding = BindCollection(source, target as any, (_item, _index, lifetime) => {
+    lifetime.Add(() => disposed++); return document.createElement('li') as any;
+  }, { keySelector: item => item.Id, update: (node, item, index) => { node.textContent = `${index}:${item.Name}`; } });
+  const first = target.children[0], second = target.children[1];
+  source.AddOrUpdate({ Id: 1, Name: 'Replacement' });
+  assert.equal(target.children[0], first); assert.equal(first.textContent, '0:Replacement'); assert.equal(disposed, 0);
+  source.Lookup(1).Value.Name = 'Refreshed'; source.RefreshKey(1);
+  assert.equal(first.textContent, '0:Refreshed'); assert.equal(target.children[1], second);
+  source.RemoveKey(1); assert.equal(target.children[0], second); assert.equal(second.textContent, '0:Second');
+  binding.Dispose(); assert.equal(disposed, 2); source.Dispose();
+});
+
+test('BindCollection replaces sources and disposes old row property subscriptions exactly once', () => {
+  const one = new ObservableCollection([new ReactiveObject({ Name: 'One' }) as any]);
+  const two = new ObservableCollection([new ReactiveObject({ Name: 'Two' }) as any]);
+  const target = document.createElement('ul'); let disposed = 0;
+  const binding = BindCollection(one, target as any, (item, _index, lifetime) => {
+    const row = document.createElement('li'); lifetime.Add(OneWayBind(item, 'Name', row as any)); lifetime.Add(() => disposed++); return row as any;
+  });
+  const detached = target.children[0]; binding.Source = two;
+  assert.equal(disposed, 1); assert.equal(target.textContent, 'Two');
+  one.GetAt(0).Name = 'Stale'; assert.equal(detached.textContent, 'One');
+  one.Add(new ReactiveObject({ Name: 'Old addition' })); assert.equal(target.children.length, 1);
+  two.GetAt(0).Name = 'Current'; assert.equal(target.textContent, 'Current');
+  binding.Dispose(); binding.Dispose(); assert.equal(disposed, 2); assert.equal(one.IsDisposed, false);
+  one.Dispose(); two.Dispose();
+});
+
+test('BindCollection preserves rows across reset, rebuilds immutable replacements without update, and keeps unmanaged content', () => {
+  const a = { Id: 1, Name: 'A' }, b = { Id: 2, Name: 'B' };
+  const source = new ObservableCollection([a, b]); const target = document.createElement('ul');
+  const heading = document.createElement('li'); heading.textContent = 'Heading'; target.append(heading);
+  const binding = BindCollection(source, target as any, item => { const row = document.createElement('li'); row.textContent = item.Name; return row as any; }, { keySelector: item => item.Id });
+  const first = target.children[1], second = target.children[2];
+  source.Reset([b, a]); assert.deepEqual([...target.children], [heading, second, first]);
+  source.SetAt(1, { Id: 1, Name: 'Changed' }); assert.notEqual(target.children[2], first); assert.equal(target.children[2].textContent, 'Changed');
+  binding.Dispose(); assert.deepEqual([...target.children], [heading]); source.Dispose();
+});
+
+
+test('BindCollection releases rows created before a renderer failure', () => {
+  const source = new ObservableCollection(['first', 'fail']); const target = document.createElement('ul'); let disposed = 0;
+  assert.throws(() => BindCollection(source, target as any, (item, _index, lifetime) => {
+    lifetime.Add(() => disposed++); if (item === 'fail') throw new Error('renderer failed');
+    return document.createElement('li') as any;
+  }), /renderer failed/);
+  assert.equal(disposed, 2); assert.equal(target.childNodes.length, 0); source.Dispose();
+});
+
+
+test('BindCollection queues source edits made while a row is being rendered', () => {
+  const source = new ObservableCollection(['first']); const target = document.createElement('ul'); let disposed = 0;
+  const binding = BindCollection(source, target as any, (item, _index, lifetime) => {
+    const row = document.createElement('li'); row.textContent = item; lifetime.Add(() => disposed++);
+    if (item === 'first') source.Add('second');
+    return row as any;
+  });
+  assert.deepEqual([...target.children].map(node => node.textContent), ['first', 'second']);
+  source.Move(0, 1); assert.deepEqual([...target.children].map(node => node.textContent), ['second', 'first']);
+  binding.Dispose(); assert.equal(disposed, 2); source.Dispose();
+});
+
+
+test('BindCollection created during snapshot notification does not repeat the pending delta', () => {
+  const source = new ObservableCollection(['a']); const target = document.createElement('ul');
+  let binding: ReturnType<typeof BindCollection<string>> | undefined;
+  const subscription = source.ItemsChanged.subscribe(items => {
+    if (items.length === 2 && !binding) binding = BindCollection(source, target as any, item => {
+      const row = document.createElement('li'); row.textContent = item; return row as any;
+    });
+  });
+  source.Add('b'); assert.equal(target.textContent, 'ab'); assert.equal(target.children.length, 2);
+  const first = target.children[0]; source.Add('c'); assert.equal(target.textContent, 'abc'); assert.equal(target.children[0], first);
+  binding!.Dispose(); subscription.unsubscribe(); source.Dispose();
 });

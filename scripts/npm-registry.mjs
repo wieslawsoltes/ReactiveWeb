@@ -95,7 +95,7 @@ async function verify(tarball, distTag) {
   const expectedIntegrity = integrityOf(await readFile(resolve(tarball)));
   const packageUrl = `${registry}/${encodeURIComponent(pkg.name)}`;
   const versionUrl = `${packageUrl}/${encodeURIComponent(pkg.version)}`;
-  const deadline = Date.now() + 120_000;
+  const deadline = Date.now() + 300_000;
   let metadata;
   let lastError;
   while (Date.now() < deadline) {
@@ -104,10 +104,13 @@ async function verify(tarball, distTag) {
       if (!metadata) throw new Error('Published version is not visible yet');
       // A visible version with different bytes is a permanent failure.
       assertRegistryArtifact(metadata, pkg, expectedIntegrity);
+      const tags = await fetchRegistryJson(`${registry}/-/package/${encodeURIComponent(pkg.name)}/dist-tags`);
+      if (tags?.[distTag] !== pkg.version) throw new Error(`npm ${distTag} currently points to ${tags?.[distTag] ?? 'no version'}; waiting for ${pkg.version}`);
       const packument = await fetchRegistryJson(packageUrl);
-      if (packument?.['dist-tags']?.[distTag] !== pkg.version) {
-        throw new Error(`npm ${distTag} does not point to ${pkg.version}`);
-      }
+      const indexedVersion = packument?.versions?.[pkg.version];
+      if (!indexedVersion) throw new Error('Published version is not visible in the npm install package index yet');
+      assertRegistryArtifact(indexedVersion, pkg, expectedIntegrity);
+      if (packument?.['dist-tags']?.[distTag] !== pkg.version) throw new Error(`npm install package index ${distTag} is not updated yet`);
       if (!metadata.dist.attestations?.provenance) throw new Error('npm provenance metadata is not visible yet');
       lastError = undefined;
       break;
@@ -146,8 +149,16 @@ async function verify(tarball, distTag) {
       env: { ...process.env, NODE_AUTH_TOKEN: '', NPM_TOKEN: '' },
     });
     assert.equal(result.status, 0, `Published npm consumer verification failed: ${result.error?.message ?? result.signal ?? result.status}`);
-    console.log(`Verified public ${pkg.name}@${pkg.version}: integrity, ${distTag} tag, provenance metadata, downloaded tarball, and installed consumers.`);
-    await summary(`Published and verified **${pkg.name}@${pkg.version}** on npm (${distTag}).\n\nRelease and registry tarballs have identical SHA512 integrity. Public download, provenance metadata, ESM/CommonJS/TypeScript consumers, and installed generator CLI checks passed.\n\n[View npm package](https://www.npmjs.com/package/${pkg.name}/v/${pkg.version})`);
+    const fresh = join(temporary, 'fresh');
+    await mkdir(fresh);
+    await writeFile(join(fresh, 'package.json'), JSON.stringify({ name: 'reactiveweb-public-registry-consumer', version: '1.0.0', private: true, type: 'module' }));
+    await writeFile(join(fresh, '.npmrc'), `registry=${registry}\n@wieslawsoltes:registry=${registry}\n`);
+    const installed = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['install', `${pkg.name}@${pkg.version}`, 'rxjs@^7.8.2', '--registry=' + registry, '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: fresh, stdio: 'inherit', timeout: 180_000, env: { ...process.env, NODE_AUTH_TOKEN: '', NPM_TOKEN: '', NPM_CONFIG_USERCONFIG: join(fresh, '.npmrc') } });
+    assert.equal(installed.status, 0, `Fresh public npm install by package name failed: ${installed.error?.message ?? installed.status}`);
+    const smoke = spawnSync(process.execPath, ['--input-type=module', '-e', `import assert from 'node:assert/strict'; import { ReactiveObject } from ${JSON.stringify(pkg.name)}; import { Observable } from 'rxjs'; const model = new ReactiveObject(); assert(model.Changed instanceof Observable); model.Dispose();`], { cwd: fresh, stdio: 'inherit', timeout: 30_000 });
+    assert.equal(smoke.status, 0, 'Fresh npm installation must run against its installed RxJS peer');
+    console.log(`Verified public ${pkg.name}@${pkg.version}: integrity, ${distTag} tag, package index, provenance metadata, downloaded tarball, installed consumers, and fresh npm installation.`);
+    await summary(`Published and verified **${pkg.name}@${pkg.version}** on npm (${distTag}).\n\nRelease and registry tarballs have identical SHA512 integrity. Public download, provenance metadata, ESM/CommonJS/TypeScript consumers, generator CLI, DynamicData identity, external RxJS interoperability, and fresh npm installation checks passed.\n\n[View npm package](https://www.npmjs.com/package/${pkg.name}/v/${pkg.version})`);
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }

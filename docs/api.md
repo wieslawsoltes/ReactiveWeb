@@ -191,11 +191,13 @@ completed.ItemsChanged.subscribe(renderTasks);
 ```
 
 Snapshots are immutable arrays; item objects remain application-owned.
-`Edit` batches nested mutations and restores the edited list if the callback
-throws. Derived lists observe item `Changed` streams and recalculate filters and
-ordering. Item-content changes that leave membership/order equal need item
-bindings in the rendered view. This is an array-based projection, not the full
-DynamicData incremental engine.
+`Edit` batches nested mutations and restores a failed edit. Derived lists now use
+DynamicDataWeb refresh/filter/sort pipelines and accept ReactiveWeb collections,
+DynamicData list/cache sources, and change-set observables. The
+`ToDynamicDataChangeSet` and `BindChangeSet` adapters preserve the existing
+ReactiveWeb change-record API while applying DynamicData batches incrementally.
+See [DynamicData integration](dynamic-data.md) for sources, operators, UI bindings,
+collection persistence and ownership contracts.
 
 ```ts
 const driver = new LocalStorageSuspensionDriver('example.state');
@@ -210,7 +212,7 @@ AutoPersist serializes save work. `Flush` surfaces a save failure; later changes
 can retry. Disposing cancels active observable saves and pending timers. JSON
 state must be explicitly reconstructed into models/commands after loading.
 `AutoPersistCollection` owns per-object persistence according to live object
-references. `SuspensionHost` coordinates launch/resume/save/invalidate streams and
+references across ReactiveWeb collections and DynamicData list/cache/change-set inputs. `SuspensionHost` coordinates launch/resume/save/invalidate streams and
 drivers; browser lifecycle events cannot guarantee asynchronous work at shutdown.
 
 See [setup](setup.md), [integration](integrations.md), [observable helpers](observables.md)

@@ -9,6 +9,8 @@ await mkdir('site/licenses', { recursive:true });
 await copyFile('node_modules/rxjs/LICENSE.txt','site/licenses/RXJS-LICENSE.txt');
 await copyFile('node_modules/react/LICENSE','site/licenses/REACT-LICENSE.txt');
 await copyFile('node_modules/react-dom/LICENSE','site/licenses/REACT-DOM-LICENSE.txt');
+await copyFile('node_modules/@wieslawsoltes/dynamicdataweb/LICENSE','site/licenses/DYNAMICDATA-LICENSE.txt');
+await copyFile('node_modules/@wieslawsoltes/dynamicdataweb/NOTICE','site/licenses/DYNAMICDATA-NOTICE.txt');
 await copyFile('LICENSE', 'site/LICENSE');
 await copyFile('NOTICE', 'site/NOTICE');
 await writeFile('site/.nojekyll', '');

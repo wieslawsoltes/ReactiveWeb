@@ -1,6 +1,7 @@
-import { BehaviorSubject, Observable, Subject, Subscription, catchError, concatMap, debounceTime, defer, EMPTY, from, isObservable, map, merge, of, tap, type SchedulerLike } from 'rxjs';
+import { BehaviorSubject, Observable, ReplaySubject, Subject, Subscription, catchError, concatMap, debounceTime, defer, EMPTY, from, isObservable, map, merge, of, tap, type SchedulerLike } from 'rxjs';
 import { Disposable, type IDisposable } from './disposables.js';
-import { ObservableCollection, ActOnEveryObject } from './collections.js';
+import { ActOnEveryObject } from './collections.js';
+import type { DynamicDataSource } from './dynamic-data.js';
 
 export type AsyncResult<T> = T | PromiseLike<T> | Observable<T>;
 export interface ISuspensionDriver<T = unknown> {
@@ -164,19 +165,20 @@ export function AttachBrowserLifecycle<T>(host: SuspensionHost<T>, target: Windo
 }
 
 /** Persists each live object independently, and releases its observer when it leaves the collection. */
-export function AutoPersistCollection<T>(collection: ObservableCollection<T>, persist: (item: T) => AsyncResult<unknown>, options: AutoPersistOptions = {}): IPersistenceSubscription {
-  const handles = new Map<T, IPersistenceSubscription>(), errors = new Subject<unknown>();
-  let disposed = false;
+export function AutoPersistCollection<T>(collection: DynamicDataSource<T>, persist: (item: T) => AsyncResult<unknown>, options: AutoPersistOptions = {}): IPersistenceSubscription {
+  const handles = new Map<T, IPersistenceSubscription>(), errors = new ReplaySubject<unknown>(1);
+  let disposed = false, lifecycleError: unknown;
   const observer = ActOnEveryObject(collection, item => {
     const handle = AutoPersist(item, persist, options); handles.set(item, handle);
     const errorsSubscription = handle.Errors.subscribe(error => errors.next(error));
     return Disposable.Create(() => { errorsSubscription.unsubscribe(); handle.Dispose(); handles.delete(item); });
   });
+  const lifecycleErrors = observer.Errors.subscribe(error => { lifecycleError = error; errors.next(error); options.onError?.(error); });
   return {
     Errors: errors.asObservable(),
-    async Flush() { if (!disposed) await Promise.all([...handles.values()].map(handle => handle.Flush())); },
+    async Flush() { if (!disposed) { await Promise.all([...handles.values()].map(handle => handle.Flush())); if (lifecycleError !== undefined) throw lifecycleError; } },
     Trigger() { if (!disposed) for (const handle of handles.values()) handle.Trigger(); },
-    Dispose() { if (disposed) return; disposed = true; observer.Dispose(); errors.complete(); },
+    Dispose() { if (disposed) return; disposed = true; try { observer.Dispose(); } finally { lifecycleErrors.unsubscribe(); errors.complete(); } },
     unsubscribe() { this.Dispose(); },
   };
 }
