@@ -68,7 +68,7 @@ jobs:
             *.tgz
             *.tar.gz
             SHA256SUMS.txt
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
