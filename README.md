@@ -1,10 +1,18 @@
 # ReactiveWeb
 
+[![CI and distribution](https://github.com/wieslawsoltes/ReactiveWeb/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/wieslawsoltes/ReactiveWeb/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/%40wieslawsoltes%2Freactiveweb)](https://www.npmjs.com/package/@wieslawsoltes/reactiveweb)
+[![npm downloads](https://img.shields.io/npm/dm/%40wieslawsoltes%2Freactiveweb)](https://www.npmjs.com/package/@wieslawsoltes/reactiveweb)
+[![Latest release](https://img.shields.io/github/v/release/wieslawsoltes/ReactiveWeb)](https://github.com/wieslawsoltes/ReactiveWeb/releases/latest)
+[![License](https://img.shields.io/github/license/wieslawsoltes/ReactiveWeb)](LICENSE)
+[![Live demo](https://img.shields.io/badge/demo-GitHub%20Pages-blue)](https://wieslawsoltes.github.io/ReactiveWeb/)
+
 **Reactive MVVM for JavaScript, TypeScript, HTML and React, powered by RxJS.**
 
 [Interactive showcase](https://wieslawsoltes.github.io/ReactiveWeb/) ·
 [Releases and full source](https://github.com/wieslawsoltes/ReactiveWeb/releases) ·
-[API compatibility](docs/compatibility.md) · [Generation guide](docs/generation.md)
+[API compatibility](docs/compatibility.md) · [Generation guide](docs/generation.md) ·
+[DynamicData integration](docs/dynamic-data.md)
 
 ReactiveWeb brings familiar `ReactiveObject`, `WhenAnyValue`, `ReactiveCommand`,
 `Interaction`, `WhenActivated`, and `RoutingState` patterns to the web. The reference
@@ -40,7 +48,8 @@ examples for the main API families.
 
 ## Install the library
 
-Install the public npm package alongside RxJS:
+Node consumers and build tools require **Node 22 or newer**. Install the public npm
+package alongside RxJS:
 
 ```sh
 npm install @wieslawsoltes/reactiveweb rxjs
