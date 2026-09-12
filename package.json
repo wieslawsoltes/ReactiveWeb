@@ -1,6 +1,6 @@
 {
   "name": "@wieslawsoltes/reactiveweb",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "RxJS MVVM for JavaScript, HTML and React with ReactiveUI-style .NET APIs",
   "type": "module",
   "license": "MIT",

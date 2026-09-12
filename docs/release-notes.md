@@ -1,18 +1,25 @@
-ReactiveWeb 0.1.0 provides RxJS-based reactive MVVM for JavaScript and TypeScript.
-The reference API is ReactiveUI.Reactive, with .NET naming and explicit web
-adaptations documented in the repository.
+ReactiveWeb 0.1.1 updates the development toolchain and completes automated public npm distribution.
 
-Included: reactive objects and properties, nested property streams, observable
-commands and cancellation, interactions, view activation, routing, validation,
-collections, services/message bus, persistence, HTML bindings and custom elements,
-React integration, accessor decorators and build-time generation.
+- Upgrades all seven dependency PRs: GitHub Actions, TypeScript 7, React 19.2,
+  Playwright 1.63, esbuild 0.28 and type declarations.
+- Fixes TypeScript 7 Node declaration discovery and isolated fixture compilation.
+- Publishes the verified release tarball to npmjs with provenance after successful
+  Node 22/24 validation and GitHub release creation.
+- Checks release checksums, public npm integrity and distribution tags, and runs
+  installed ESM, CommonJS, strict TypeScript and generator CLI consumers against
+  the tarball downloaded from npm.
+- Preserves Pages artifacts and the interactive showcase.
 
-The interactive showcase is available at https://wieslawsoltes.github.io/ReactiveWeb/.
+Install from npm:
 
-Assets include the npm-compatible package, browser module distribution, static
-showcase, and SHA-256 checksums. GitHub supplies complete source archives below.
-Install the .tgz directly with npm or use the GitHub Packages npm registry.
+```sh
+npm install @wieslawsoltes/reactiveweb@0.1.1 rxjs
+```
 
-Read docs/compatibility.md before migrating an existing application. Complete
-upstream overload equivalence, native platform APIs, Roslyn analyzer compatibility,
-and exhaustive differential conformance are not claimed by this release.
+The public API is unchanged. RxJS remains an external peer dependency in npm
+packages. Read docs/compatibility.md for the ReactiveUI mapping and web adaptations.
+
+Showcase: https://wieslawsoltes.github.io/ReactiveWeb/
+
+Assets contain the npm package, standalone browser modules, static showcase and
+SHA-256 checksums. GitHub also provides full source archives.

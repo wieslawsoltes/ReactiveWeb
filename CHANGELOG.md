@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.1
+
+* Upgrade development dependencies, including TypeScript 7, React 19.2, Playwright
+  1.63 and esbuild 0.28, and update the GitHub Actions used for verification,
+  package distribution and Pages deployment.
+* Explicitly include Node declarations and isolate generated-code/package
+  consumer compiler options for TypeScript 7 compatibility.
+* Automatically publish each new verified release to npmjs with provenance,
+  using the release tarball and validating its checksums.
+* Verify public registry metadata, integrity and distribution tags, then download
+  the published tarball and exercise ESM, CommonJS, TypeScript and generator CLI
+  consumers. Repeated publication verifies existing bytes instead of overwriting.
+* Retain the generated Pages hidden files in the deployed artifact.
+
+The public library API and RxJS peer dependency are unchanged.
+
 ## 0.1.0
 
 Initial public RxJS-based MVVM implementation with .NET-style APIs, reactive

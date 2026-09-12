@@ -18,7 +18,7 @@ from HTML and optional React adapters. Reactive properties can be explicit
 accessors, standard TypeScript accessor decorators, schema-generated classes, or
 readable source produced at build time.
 
-This is an independent MIT-licensed implementation. **Version 0.1.0 implements the
+This is an independent MIT-licensed implementation. **Version 0.1.1 implements the
 documented browser MVVM surface; it does not claim exhaustive API or behavioral
 equivalence to every ReactiveUI package and native platform.** See the pinned
 [upstream audit](docs/upstream-audit.md) and detailed [mapping](docs/compatibility.md).
@@ -40,19 +40,7 @@ examples for the main API families.
 
 ## Install the library
 
-Every versioned GitHub release contains an npm-compatible `.tgz`. Install a
-downloaded asset alongside RxJS:
-
-```sh
-npm install ./wieslawsoltes-reactiveweb-0.1.0.tgz rxjs
-```
-
-The CI pipeline also publishes to GitHub Packages. Configure the scope and
-authenticate according to GitHub's npm-registry requirements:
-
-```ini
-@wieslawsoltes:registry=https://npm.pkg.github.com
-```
+Install the public npm package alongside RxJS:
 
 ```sh
 npm install @wieslawsoltes/reactiveweb rxjs
@@ -60,9 +48,17 @@ npm install @wieslawsoltes/reactiveweb rxjs
 npm install react react-dom
 ```
 
-Public npmjs publication has a separate workflow requiring the package owner's
-trusted-publisher setup or npm credential; it is not implied by a GitHub release.
-See [publishing](docs/publishing.md).
+Every versioned GitHub release also contains an npm-compatible `.tgz`:
+
+```sh
+npm install ./wieslawsoltes-reactiveweb-0.1.1.tgz rxjs
+```
+
+The release pipeline publishes the same verified package to npmjs and GitHub
+Packages. GitHub Packages consumers must configure
+`@wieslawsoltes:registry=https://npm.pkg.github.com` and authenticate according to
+GitHub's npm-registry requirements. Public npmjs installation requires no registry
+configuration. See [publishing](docs/publishing.md) for release and credential setup.
 
 | Entry point | Purpose |
 | --- | --- |
@@ -294,9 +290,10 @@ npm pack                # publishable .tgz
 CI validates Node 22 and 24, compiles and executes generated source, checks installed
 ESM/CommonJS consumers, exercises Chromium, and retains visual artifacts. Successful
 `main` builds deploy GitHub Pages and publish a new package version to GitHub
-Packages and GitHub Releases. Increment the version and update release notes for a
-new release; existing release assets are left unchanged. A separate manual
-workflow publishes an existing release tag to npmjs with provenance.
+Packages and GitHub Releases, then call the npm publication workflow with provenance.
+The workflow verifies registry integrity and tests the downloaded npm tarball.
+Increment the version and update release notes for a new release; existing release
+assets are left unchanged. Manual publication of an existing release remains available.
 
 ## Platform and compatibility boundaries
 

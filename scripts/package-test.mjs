@@ -5,6 +5,9 @@ import { spawnSync } from 'node:child_process';
 
 const project = resolve('.');
 const packageJson = JSON.parse(await readFile(join(project, 'package.json'), 'utf8'));
+const args = process.argv.slice(2);
+assert(args.length === 0 || (args.length === 2 && args[0] === '--tarball'), 'Usage: node scripts/package-test.mjs [--tarball path]');
+const suppliedTarball = args.length ? resolve(args[1]) : undefined;
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 function run(command, args, cwd, label) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8', timeout: 60_000, env: { ...process.env, npm_config_update_notifier: 'false' } });
@@ -15,7 +18,9 @@ function run(command, args, cwd, label) {
 await mkdir(join(project, 'test-results'), { recursive: true });
 const temporary = await mkdtemp(join(project, 'test-results/package-'));
 try {
-  const packResult = JSON.parse(run(npm, ['pack', '--ignore-scripts', '--json', '--pack-destination', temporary], project, 'npm pack'));
+  const packResult = JSON.parse(run(npm, ['pack', ...(suppliedTarball ? [suppliedTarball] : []), '--ignore-scripts', '--json', '--pack-destination', temporary], project, 'npm pack'));
+  assert.equal(packResult[0].name, packageJson.name, 'Tarball package name must match the checked-out source');
+  assert.equal(packResult[0].version, packageJson.version, 'Tarball version must match the checked-out source');
   const tarball = join(temporary, packResult[0].filename);
   const packedFiles = new Set(packResult[0].files.map(file => file.path));
   for (const file of ['dist/index.js', 'dist/index.d.ts', 'dist/cjs/index.js', 'dist/cjs/package.json', 'dist/generator-cli.js', 'dist/react.js', 'dist/html.js', 'dist/generation.js', 'src/index.ts', 'docs/generation.md', 'examples/generation/counter.schema.json']) {

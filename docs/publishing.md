@@ -15,6 +15,8 @@ A successful main build produces:
 * `SHA256SUMS.txt` for downloaded artifact verification.
 * A GitHub Pages artifact deployed through the `github-pages` environment.
 * A GitHub Packages version and a GitHub release tagged `vVERSION` if new.
+* A public npmjs version, followed by verification of its downloaded package,
+  when the release tag identifies the verified main commit.
 
 The release and Pages jobs are independent after package validation. Package
 publication uses `GITHUB_TOKEN` with scoped `packages: write`; creating the release
@@ -41,33 +43,83 @@ registry requirement. See [GitHub's npm registry documentation](https://docs.git
 2. Update `CHANGELOG.md`, `docs/release-notes.md`, and visible showcase version.
 3. Run `npm run check`, `npm run test:package`, and `npm run test:browser`.
 4. Commit and merge/push to main. CI creates `vVERSION`, publishes the package,
-   attaches the verified assets and deploys the showcase.
+   attaches the verified assets, publishes that exact release tarball to npmjs,
+   verifies its public installation, and deploys the showcase.
 
 Existing package versions and release assets are immutable. A later main commit
 with the same version deploys the showcase but retains the existing release and
 package. Bump the package version for changes intended for distribution.
 
-## Optional public npmjs publishing
+## Public npmjs publishing
 
-`.github/workflows/npm-publish.yml` accepts an existing release tag and distribution
-tag (`latest` or `next`). It checks out that version, validates the tag against the
-package, rebuilds/tests, checks the packaged consumers and publishes with
-provenance. This workflow does not silently claim npmjs publication on main.
+`.github/workflows/npm-publish.yml` is called automatically after the main CI
+release job. It also accepts manual dispatch with an existing release `tag`, an
+optional full `expected_sha`, and a distribution `dist_tag` (`latest` or `next`).
+The automatic caller supplies the exact verified commit. It skips publication on
+later main commits that retain a version whose release belongs to an earlier
+commit. Failed publication can be retried by rerunning the failed CI job, or by
+manually dispatching the publication workflow for the release tag.
+This asset-verification workflow supports release tags from `v0.1.1` onward;
+older tags do not contain the registry verification script or tarball test option.
 
-The npm package owner must configure a trusted publisher on npmjs for:
+The workflow checks out `refs/tags/TAG`, validates the package version and commit,
+and downloads the existing release tarball and `SHA256SUMS.txt`. It verifies that
+checksum and runs the isolated ESM, CommonJS, TypeScript, RxJS identity, and
+generator CLI consumers against the downloaded tarball. Publication uses that
+same archive with `--ignore-scripts`, so no build runs between verification and
+publication.
+
+Set the repository or `npm` environment secret `NPM_TOKEN` to a token authorized
+to publish `@wieslawsoltes/reactiveweb`, or configure npm trusted publishing. The
+token is available only in the publication step, not during dependency
+installation, package tests, or public registry verification. Package ownership,
+token permissions, and any account two-factor requirements must permit
+noninteractive publication; the workflow does not change those account settings.
+
+For trusted publishing, use these npmjs settings:
 
 | Field | Value |
 | --- | --- |
 | Organization/user | `wieslawsoltes` |
 | Repository | `ReactiveWeb` |
-| Workflow filename | `npm-publish.yml` |
+| Workflow filename, automatic publication | `ci.yml` |
+| Workflow filename, manual publication | `npm-publish.yml` |
 | Environment | `npm` |
 
-The workflow uses Node 24 and npm 11 to meet npm's OIDC requirements. An `NPM_TOKEN`
-environment/repository secret can be used for a first publish or fallback if the
-owner chooses token-based authentication. Never place a token in tracked `.npmrc`
-or source. Package ownership and first-publication requirements must be satisfied
-on npmjs; they are outside the source repository. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+For reusable workflows, npm checks the calling workflow's identity. Configure
+both identities if both entry points should use OIDC, and allow direct
+`npm publish` when configuring the publisher. The caller and called job both
+grant `id-token: write`. Node 24 and npm 11 support OIDC authentication with token
+fallback and provenance generation. Never put a token in tracked `.npmrc` or
+source. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+
+`scripts/npm-registry.mjs` queries the public registry without credentials. A
+confirmed 404 permits publication. An existing version is skipped only when its
+SHA512 integrity equals the release bytes; a mismatch or permanent registry error
+fails. After publication it waits up to two minutes for the version, requested
+distribution tag, and provenance metadata to appear, downloads the public npm
+tarball, compares its SHA512, and reruns the installed consumers. This checks the
+presence of provenance metadata, not a separate cryptographic attestation audit.
+An existing version whose distribution tag has moved to another version is not
+silently retagged; verification reports that mismatch.
+
+The reusable workflow interface is:
+
+```yaml
+npm:
+  needs: release
+  if: needs.release.outputs.publish == 'true'
+  permissions:
+    contents: read
+    id-token: write
+  uses: ./.github/workflows/npm-publish.yml
+  with:
+    tag: ${{ needs.release.outputs.tag }}
+    expected_sha: ${{ github.sha }}
+    dist_tag: latest
+  secrets:
+    NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
 
 ## Reproduce artifacts locally
 
