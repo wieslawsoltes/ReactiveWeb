@@ -105,7 +105,7 @@ model.Add.Execute('invalid');
 `;
   await writeFile(join(consumer, 'consumer.ts'), typed);
   await writeFile(join(consumer, 'consumer.cts'), `import core = require(${JSON.stringify(importName)});\nimport generation = require(${JSON.stringify(importName + '/generation')});\nconst model = new (generation.defineViewModel({ properties: { Count: generation.reactiveProperty(1) } }))();\nconst count: number = model.Count;\nconst object: core.ReactiveObject = model;\nvoid [count, object];\n`);
-  run(process.execPath, [join(project, 'node_modules/typescript/bin/tsc'), '--noEmit', '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--skipLibCheck', '--lib', 'ES2022,DOM,ESNext.Decorators', 'consumer.ts', 'consumer.cts'], consumer, 'strict TypeScript ESM/CommonJS consumers');
+  run(process.execPath, [join(project, 'node_modules/typescript/bin/tsc'), '--ignoreConfig', '--noEmit', '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--skipLibCheck', '--lib', 'ES2022,DOM,ESNext.Decorators', 'consumer.ts', 'consumer.cts'], consumer, 'strict TypeScript ESM/CommonJS consumers');
   console.log('Strict TypeScript consumers and negative type assertions: passed');
 
   await writeFile(join(consumer, 'counter.schema.json'), JSON.stringify({ className: 'Counter', properties: { Count: { type: 'number', initial: 5, validate: { minimum: 0 } } } }));
