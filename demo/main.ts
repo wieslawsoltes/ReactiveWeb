@@ -1,5 +1,7 @@
-import { BehaviorSubject, Subject, Observable, Subscription, interval, timer, map, take, firstValueFrom } from 'rxjs';
+import { BehaviorSubject, Subject, Observable, Subscription, interval, timer, map, take, firstValueFrom, tap, combineLatest } from 'rxjs';
 import { createElement, StrictMode } from 'react';
+import { SourceCache, AutoRefresh, Filter, Sort, Page, Sum, type PageResponse } from '@wieslawsoltes/dynamicdataweb';
+import { ToReactiveCollection } from '../src/dynamic-data.js';
 import { createRoot } from 'react-dom/client';
 import {
   ReactiveObject, DefineReactiveProperty, WhenAnyValue, ToProperty, ReactiveCommand,
@@ -8,8 +10,8 @@ import {
   BindableDerivedList, LocalStorageSuspensionDriver, AutoPersist, SuspensionHost,
   ReactiveValidationObject, ValidationRule, defineViewModel, reactiveProperty, RxApp
 } from '../src/index.js';
-import { Bind, OneWayBind, BindCommand, BindValidation, ReactiveElement, RoutedViewHost, RegisterReactiveElements } from '../src/html.js';
-import { useReactiveObject, useReactiveCommand, useWhenActivated } from '../src/react.js';
+import { Bind, OneWayBind, BindCommand, BindValidation, BindCollection, ReactiveElement, RoutedViewHost, RegisterReactiveElements } from '../src/html.js';
+import { useReactiveObject, useReactiveCommand, useWhenActivated, useReactiveCollection } from '../src/react.js';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 RegisterReactiveElements();
@@ -223,6 +225,83 @@ tasks.Edit(list => { list.Add(first); list.Add(second); });
 active.ItemsChanged.subscribe(renderTasks);
 // Live item Changed streams update filter and sort results.`);
 }
+function dynamicdata(){
+  lab.innerHTML=`<div class="tags"><span class="tag">DynamicDataWeb</span><span class="tag">SourceCache → AutoRefresh → Filter → Sort → Page</span></div>
+  <div class="form-grid"><div class="field"><label for="dd-search">Find a task</label><input id="dd-search" placeholder="Filter titles live" autocomplete="off"></div><div class="field"><label for="dd-sort">Order tasks</label><select id="dd-sort"><option value="hours">Most hours first</option><option value="title">Title A–Z</option></select></div></div>
+  <label class="switch-row"><input id="dd-open-only" type="checkbox"> Show unfinished tasks only</label>
+  <div class="live-preview"><div class="avatar">∑</div><div><strong><span id="dd-total-hours">0</span> estimated hours</strong><small><span id="dd-source-count">0</span> tasks in a keyed cache. Property edits update the total immediately.</small></div></div>
+  <div class="button-row"><button id="dd-add" class="primary">Add task</button><button id="dd-promote" class="secondary">Prioritize HTML binding</button></div>
+  <h3>HTML collection binding</h3><ul class="list" id="dd-html-list" aria-label="HTML task collection"></ul>
+  <div class="button-row"><button id="dd-prev" class="secondary">Previous</button><span class="status" id="dd-page" aria-live="polite"></span><button id="dd-next" class="secondary">Next</button></div>
+  <h3>React collection binding</h3><div id="dd-react-root"></div>
+  <p class="note">Both views share one collection projected from DynamicDataWeb. Edit hours or completion in either view: native ReactiveObject notifications drive filtering, sorting, paging, and aggregation. Moved rows retain their HTML nodes and owned bindings.</p>`;
+  type Task = ReactiveObject & { Id:number; Title:string; Hours:number; Done:boolean };
+  const cache = new SourceCache<Task, number>(task => task.Id); scope.Add(cache);
+  const initial = [['API adapter',8],['Live filtering',5],['HTML binding',3],['React hook',2],['Persistence',4],['Publish release',1]] as const;
+  cache.AddOrUpdate(initial.map(([Title,Hours],index)=>model({Id:index+1,Title,Hours,Done:index===5}) as Task));
+  const query = new BehaviorSubject(''), unfinished = new BehaviorSubject(false);
+  const comparer = new BehaviorSubject<(a:Task,b:Task)=>number>((a,b)=>b.Hours-a.Hours || a.Id-b.Id);
+  const requests = new BehaviorSubject({page:1,size:3});
+  scope.Add(()=>{query.complete();unfinished.complete();comparer.complete();requests.complete();});
+  let response:PageResponse = {page:1,pages:1,size:3,totalSize:0}, nextId=7;
+  const predicates = combineLatest([query,unfinished]).pipe(map(([text,openOnly])=>(task:Task)=>task.Title.toLowerCase().includes(text) && (!openOnly || !task.Done)));
+  const pageChanges = cache.Connect().pipe(AutoRefresh<Task,number>(), Filter<Task,number>(predicates), Sort<Task,number>(comparer), Page<Task,number>(requests), tap(changes=>{
+    if(changes.response && 'page' in changes.response) response=changes.response;
+    $('dd-page').textContent=`Page ${response.page} of ${response.pages} · ${response.totalSize} matching`;
+    $<HTMLButtonElement>('dd-prev').disabled=response.page<=1;$<HTMLButtonElement>('dd-next').disabled=response.page>=response.pages;
+  }));
+  const page = ToReactiveCollection(pageChanges); scope.Add(page);
+  scope.Add(page.Errors.subscribe(error=>log('DynamicData error',String(error))));
+  scope.Add(BindCollection(page.Collection,$('dd-html-list'),(task,_index,lifetime)=>{
+    const row=document.createElement('li');row.dataset.itemId=String(task.Id);
+    const label=document.createElement('label'), checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.className='dd-done';checkbox.setAttribute('aria-label',`Complete ${task.Title}`);
+    const title=document.createElement('span');lifetime.Add(Bind(task,'Done',checkbox,'checked'));lifetime.Add(OneWayBind(task,'Title',title));
+    label.append(checkbox,title);const controls=document.createElement('div'),hours=document.createElement('span');hours.className='dd-hours';lifetime.Add(OneWayBind(task,'Hours',hours,'textContent',{convert:value=>`${value} h `}));
+    const increase=document.createElement('button');increase.textContent='+1 h';increase.className='dd-increase';increase.setAttribute('aria-label',`Increase hours for ${task.Title}`);increase.onclick=()=>task.Hours++;
+    const remove=document.createElement('button');remove.textContent='×';remove.className='dd-remove';remove.setAttribute('aria-label',`Remove ${task.Title}`);remove.onclick=()=>cache.RemoveKey(task.Id);
+    lifetime.Add(()=>{increase.onclick=null;remove.onclick=null;});controls.append(hours,increase,remove);row.append(label,controls);return row;
+  },{keySelector:task=>task.Id}));
+  function TaskRow({task}:{task:Task}){
+    const vm=useReactiveObject(task);
+    return createElement('li',{'data-react-item-id':vm.Id},createElement('span',null,vm.Title),createElement('button',{onClick:()=>vm.Hours++,className:'dd-react-increase'},`${vm.Hours} h · +1`));
+  }
+  function TaskList(){const tasks=useReactiveCollection(page.Collection);return createElement('ul',{className:'list',id:'dd-react-list','aria-label':'React task collection'},...tasks.map(task=>createElement(TaskRow,{key:task.Id,task})));}
+  const reactRoot=createRoot($('dd-react-root'));reactRoot.render(createElement(StrictMode,null,createElement(TaskList)));scope.Add(()=>reactRoot.unmount());
+  scope.Add(cache.CountChanged.subscribe(count=>{$('dd-source-count').textContent=String(count);}));
+  scope.Add(cache.Connect().pipe(AutoRefresh<Task,number>('Hours'),Sum<Task,number>(task=>task.Hours)).subscribe(total=>{$('dd-total-hours').textContent=String(total);}));
+  scope.Add(page.Collection.CollectionChanged.subscribe(changes=>{
+    log('DynamicData → collection',changes.map(change=>({Reason:change.Reason,Index:change.Index,Count:change.Items.length})));
+    inspect({SourceCount:cache.Count,VisibleIds:page.Collection.Items.map(task=>task.Id),Page:response.page,Matching:response.totalSize},'DynamicData task workspace');
+  }));
+  inspect({SourceCount:cache.Count,VisibleIds:page.Collection.Items.map(task=>task.Id),Page:response.page,Matching:response.totalSize},'DynamicData task workspace');
+  on('dd-search','input',()=>{requests.next({page:1,size:3});query.next($<HTMLInputElement>('dd-search').value.trim().toLowerCase());});
+  on('dd-open-only','change',()=>{requests.next({page:1,size:3});unfinished.next($<HTMLInputElement>('dd-open-only').checked);});
+  on('dd-sort','change',()=>comparer.next($<HTMLSelectElement>('dd-sort').value==='title'?(a,b)=>a.Title.localeCompare(b.Title):(a,b)=>b.Hours-a.Hours || a.Id-b.Id));
+  on('dd-prev','click',()=>requests.next({page:Math.max(1,response.page-1),size:3}));
+  on('dd-next','click',()=>requests.next({page:Math.min(response.pages,response.page+1),size:3}));
+  on('dd-add','click',()=>{const Id=nextId++;cache.AddOrUpdate(model({Id,Title:`Added task ${Id}`,Hours:6,Done:false}) as Task);});
+  on('dd-promote','click',()=>{const task=cache.Lookup(3);if(task.HasValue)task.Value.Hours+=10;});
+  code(`import { SourceCache, AutoRefresh, Filter, Sort, Page } from '@wieslawsoltes/dynamicdataweb';
+import { ToReactiveCollection } from '@wieslawsoltes/reactiveweb/dynamic-data';
+
+const tasks = new SourceCache(task => task.Id);
+const page = ToReactiveCollection(tasks.Connect().pipe(
+  AutoRefresh(), Filter(predicate$), Sort(comparer$), Page(request$)
+));
+
+// Dispose the adapter and binding with the owning view lifetime.
+BindCollection(page.Collection, list, (task, index, lifetime) => {
+  const row = document.createElement('li');
+  lifetime.Add(OneWayBind(task, 'Title', row));
+  return row;
+});
+
+// React shares the same immutable collection snapshots.
+function TaskList() {
+  const items = useReactiveCollection(page.Collection);
+  return items.map(task => <TaskRow key={task.Id} task={task} />);
+}`);
+}
 function persistence(){
   lab.innerHTML=`<div class="field"><label for="draft">Draft text</label><textarea id="draft" rows="3" style="height:90px;resize:vertical"></textarea><small>Saved to this browser after 300 ms of inactivity.</small></div><div class="button-row"><button id="flush" class="primary">Flush now</button><button id="restore" class="secondary">Restore saved</button><button id="forget" class="secondary">Clear saved state</button></div><p id="persist-status" class="note">Edit the draft, navigate away, and return. The saved value is restored.</p>`;
   const driver=new LocalStorageSuspensionDriver<{Draft:string}>('reactiveweb.demo.draft');const saved=driver.LoadState();const vm=model({Draft:saved?.Draft??'A reactive draft that survives a page refresh.'});
@@ -300,6 +379,7 @@ const examples:Record<string,{title:string;icon:string;heading:string;descriptio
   interactions:{title:'Interactions',icon:'⇄',heading:'Ask the view. Keep the model.',description:'Request a user decision through a typed interaction contract.',lab:'Confirmation workflow',meta:'INTERACTION',render:interactions},
   validation:{title:'Validation',icon:'✓',heading:'Valid state, ready to act.',description:'Compose synchronous and asynchronous validation with command gating.',lab:'Account form',meta:'VALIDATIONCONTEXT',render:validation},
   collections:{title:'Collections',icon:'☷',heading:'Collections that stay in sync.',description:'Batch mutations, observe item changes, and derive filtered lists.',lab:'Task collection',meta:'OBSERVABLECOLLECTION',render:collections},
+  dynamicdata:{title:'DynamicData workspace',icon:'⊞',heading:'One change stream. Every view.',description:'Keyed caches and live queries, shared by HTML and React.',lab:'Task planning workspace',meta:'DYNAMICDATAWEB',render:dynamicdata},
   persistence:{title:'Persistence',icon:'▣',heading:'Keep the state that matters.',description:'Persist reactive changes through a pluggable state driver.',lab:'Persistent draft',meta:'AUTOPERSIST',render:persistence},
   messaging:{title:'Services & messages',icon:'↔',heading:'Connect without coupling.',description:'Resolve services and exchange typed messages across view models.',lab:'Message channel',meta:'MESSAGEBUS + LOCATOR',render:messaging},
   generation:{title:'Property generation',icon:'{ }',heading:'Less boilerplate. Same patterns.',description:'Generate ordinary accessors at build time or define a model from a schema.',lab:'Generated invoice',meta:'DEFINEVIEWMODEL',render:generation},

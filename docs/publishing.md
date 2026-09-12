@@ -96,9 +96,10 @@ source. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 `scripts/npm-registry.mjs` queries the public registry without credentials. A
 confirmed 404 permits publication. An existing version is skipped only when its
 SHA512 integrity equals the release bytes; a mismatch or permanent registry error
-fails. After publication it waits up to two minutes for the version, requested
-distribution tag, and provenance metadata to appear, downloads the public npm
-tarball, compares its SHA512, and reruns the installed consumers. This checks the
+fails. After publication it waits up to five minutes for the version, requested
+distribution tag, installable package index, and provenance metadata to appear, downloads the public npm
+tarball, compares its SHA512, reruns the installed consumers, and checks a fresh
+anonymous installation by package name. This checks the
 presence of provenance metadata, not a separate cryptographic attestation audit.
 An existing version whose distribution tag has moved to another version is not
 silently retagged; verification reports that mismatch.

@@ -2,7 +2,8 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import { Observable, Subscription, firstValueFrom, switchMap, take } from 'rxjs';
 import { CompositeDisposable, dispose, type DisposableLike, type IDisposable } from './disposables.js';
 import type { ReactiveObject } from './reactive-object.js';
-import type { CommandLike, RouterLike, ViewResolver } from './html.js';
+import type { CommandLike, RouterLike, ViewResolver, CollectionViewSource, ReactiveCollectionSource } from './html.js';
+import { ToReactiveCollection, type DynamicDataSource } from './dynamic-data.js';
 import { ViewLocator } from './services.js';
 
 interface ObservableStore<T> { subscribe(listener: () => void): () => void; getSnapshot(): T; getServerSnapshot(): T }
@@ -39,6 +40,45 @@ export function useObservable<T>(source: Observable<T>, initialValue?: T, server
   const store = useMemo(() => makeObservableStore(source as Observable<T | undefined>, initial, serverValue === undefined ? initial : serverValue), [source]);
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
 }
+
+function makeCollectionStore<T, K>(source: CollectionViewSource<T, K>, serverSnapshot?: readonly T[]): ObservableStore<readonly T[]> {
+  // Reading Items starts no observable work, including on the server or abandoned renders.
+  const initial = 'Items' in source ? Array.from(source.Items) as T[] : [];
+  let snapshot: readonly T[] = Object.freeze(initial);
+  const server = serverSnapshot === undefined ? snapshot : Object.freeze([...serverSnapshot]);
+  let connection: CompositeDisposable | undefined;
+  let failure: unknown, failed = false;
+  const listeners = new Set<() => void>();
+  const notify = () => { for (const listener of [...listeners]) listener(); };
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      if (!connection) {
+        const lifetime = new CompositeDisposable(); connection = lifetime;
+        const binding = 'ItemsChanged' in source ? undefined : ToReactiveCollection(source as DynamicDataSource<T, K>);
+        if (binding) lifetime.Add(binding);
+        const collection = (binding?.Collection ?? source) as ReactiveCollectionSource<T>;
+        // A finite synchronous source may complete its snapshot subject before subscription.
+        snapshot = Object.freeze([...collection.Items]); failed = false; notify();
+        const error = (reason: unknown) => { failed = true; failure = reason; notify(); };
+        lifetime.Add(collection.ItemsChanged.subscribe({
+          next(items) { snapshot = Object.freeze([...items]); failed = false; notify(); }, error,
+        }));
+        if (binding) lifetime.Add(binding.Errors.subscribe(error));
+      }
+      return () => { listeners.delete(listener); if (!listeners.size) { const old = connection; connection = undefined; old?.Dispose(); } };
+    },
+    getSnapshot() { if (failed) throw failure; return snapshot; },
+    getServerSnapshot() { return server; },
+  };
+}
+/** Immutable, cached collection snapshots; subscribes only after commit and owns no source. */
+export function useReactiveCollection<T, K = unknown>(source: CollectionViewSource<T, K>, serverSnapshot?: readonly T[]): readonly T[] {
+  // A server snapshot initializes a source. Inline snapshot literals must not recreate subscriptions.
+  const store = useMemo(() => makeCollectionStore(source, serverSnapshot), [source]);
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
+}
+export const useCollection = useReactiveCollection;
 
 interface ReactiveStore { subscribe(listener: () => void): () => void; getSnapshot(): number; getServerSnapshot(): number }
 const reactiveStores = new WeakMap<object, ReactiveStore>();

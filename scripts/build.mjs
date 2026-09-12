@@ -6,6 +6,8 @@ await build({ entryPoints: entries, outdir: 'dist/cjs', bundle: false, platform:
 await writeFile('dist/cjs/package.json', JSON.stringify({type:'commonjs'}));
 await mkdir('dist/third-party', { recursive:true });
 await copyFile('node_modules/rxjs/LICENSE.txt','dist/third-party/RXJS-LICENSE.txt');
+await copyFile('node_modules/@wieslawsoltes/dynamicdataweb/LICENSE', 'dist/third-party/DYNAMICDATA-LICENSE.txt');
+await copyFile('node_modules/@wieslawsoltes/dynamicdataweb/NOTICE', 'dist/third-party/DYNAMICDATA-NOTICE.txt');
 await copyFile('LICENSE', 'dist/LICENSE');
 await copyFile('NOTICE', 'dist/NOTICE');
 await build({ entryPoints: { 'reactiveweb.browser':'src/browser.ts', 'reactiveweb-html.browser':'src/html.ts' }, outdir:'dist', bundle: true, splitting:true, chunkNames:'browser-chunks/[name]-[hash]', platform: 'browser', format: 'esm', target: 'es2022', minify: true, sourcemap: true });

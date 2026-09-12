@@ -6,6 +6,8 @@ import { ViewLocator } from './services.js';
 import type { ValidationContext, IValidatableViewModel } from './validation.js';
 import type { Interaction, InteractionHandler } from './interaction.js';
 import { ConverterService, PropertyBindingHookRegistry, type BindingTypeToken } from './converters.js';
+import { ToReactiveCollection, type DynamicDataSource } from './dynamic-data.js';
+import type { ChangeSet } from './collections.js';
 
 export interface IViewFor<T = unknown> { ViewModel: T | null }
 export interface IBindingTypeConverter<TFrom = unknown, TTo = unknown> { Convert(value: TFrom): TTo; ConvertBack?(value: TTo): TFrom }
@@ -30,6 +32,154 @@ export interface CommandLike<T = unknown, R = unknown> {
 export class ReactiveBinding extends CompositeDisposable {
   get IsBound(): boolean { return !this.IsDisposed; }
 }
+/** Structural collection contract shared by HTML and React; snapshots are immutable. */
+export interface ReactiveCollectionSource<T> {
+  readonly Items: readonly T[];
+  readonly ItemsChanged: Observable<readonly T[]>;
+  readonly CollectionChanged?: Observable<ChangeSet<T>>;
+  Connect?(): Observable<ChangeSet<T>>;
+}
+export type CollectionViewSource<T, K = unknown> = ReactiveCollectionSource<T> | DynamicDataSource<T, K>;
+export interface CollectionBindingOptions<T> {
+  /** Stable business identity. Repeated keys are matched by occurrence. */
+  keySelector?: (item: T) => unknown;
+  /** Updates retained nodes after refresh, replacement, or a changed index. */
+  update?: (node: Node, item: T, index: number, lifetime: CompositeDisposable) => void;
+  onError?: (error: unknown) => void;
+}
+export type CollectionItemRenderer<T> = (item: T, index: number, lifetime: CompositeDisposable) => Node;
+interface CollectionRow<T> { item: T; key: unknown; node: Node; lifetime: CompositeDisposable }
+
+/** Owns rendered rows and subscriptions, while the caller retains collection ownership. */
+export class ReactiveCollectionBinding<T, K = unknown> extends ReactiveBinding {
+  private source: CollectionViewSource<T, K>;
+  private readonly connection = new SerialDisposable();
+  private rows: CollectionRow<T>[] = [];
+  private readonly ownedRows = new Set<CollectionRow<T>>();
+  private readonly ownedNodes = new Set<Node>();
+  private readonly anchor: Comment;
+  private processing = false;
+  private generation = 0;
+  private readonly pending: (() => void)[] = [];
+  constructor(source: CollectionViewSource<T, K>, readonly Element: Element, private readonly render: CollectionItemRenderer<T>, private readonly options: CollectionBindingOptions<T> = {}) {
+    super(); this.source = source;
+    this.anchor = Element.ownerDocument.createComment('ReactiveWeb collection'); Element.append(this.anchor);
+    this.Add(this.connection);
+    this.Add(() => { try { this.clearRows(); } finally { this.anchor.remove(); } });
+    try { this.connect(); } catch (error) { this.Dispose(); throw error; }
+  }
+  get Source(): CollectionViewSource<T, K> { return this.source; }
+  set Source(value: CollectionViewSource<T, K>) {
+    if (this.IsDisposed) throw new Error('Collection binding is disposed');
+    if (this.source === value) return;
+    this.run(() => { this.connection.Disposable = undefined; this.clearRows(); this.source = value; this.connect(); });
+  }
+  private run(action: () => void): void {
+    this.pending.push(action);
+    if (this.processing) return;
+    this.processing = true;
+    try { while (this.pending.length && !this.IsDisposed) this.pending.shift()!(); }
+    catch (error) { this.pending.length = 0; throw error; }
+    finally { this.processing = false; if (this.IsDisposed) this.pending.length = 0; }
+  }
+  private clearRows(): void {
+    const old = [...this.ownedRows]; this.rows = []; this.ownedRows.clear(); this.ownedNodes.clear();
+    const resources = new CompositeDisposable(...old.map(row => () => { try { row.lifetime.Dispose(); } finally { row.node.parentNode?.removeChild(row.node); } }));
+    resources.Dispose();
+  }
+  private createRow(item: T, index: number): CollectionRow<T> {
+    const lifetime = new CompositeDisposable();
+    try {
+      const node = this.render(item, index, lifetime);
+      if (!node || typeof node.nodeType !== 'number' || node.nodeType === 11) throw new TypeError('Collection renderer must return one persistent DOM node, not a DocumentFragment');
+      if (this.ownedNodes.has(node)) throw new TypeError('Collection renderer must return a distinct node for each occurrence');
+      const row = { item, key: this.options.keySelector ? this.options.keySelector(item) : item, node, lifetime };
+      this.ownedRows.add(row); this.ownedNodes.add(node); return row;
+    } catch (error) { lifetime.Dispose(); throw error; }
+  }
+  private removeRows(rows: CollectionRow<T>[]): void {
+    for (const row of rows) { this.ownedRows.delete(row); this.ownedNodes.delete(row.node); }
+    new CompositeDisposable(...rows.map(row => () => { try { row.lifetime.Dispose(); } finally { row.node.parentNode?.removeChild(row.node); } })).Dispose();
+  }
+  private reconcile(items: readonly T[]): void {
+    const available = new Map<unknown, CollectionRow<T>[]>();
+    for (const row of this.rows) { const bucket = available.get(row.key) ?? []; bucket.push(row); available.set(row.key, bucket); }
+    const next: CollectionRow<T>[] = [];
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index]!;
+      const key = this.options.keySelector ? this.options.keySelector(item) : item;
+      const bucket = available.get(key);
+      let row: CollectionRow<T> | undefined;
+      if (bucket?.length) {
+        const same = bucket.findIndex(candidate => Object.is(candidate.item, item));
+        if (same >= 0) row = bucket.splice(same, 1)[0];
+        else if (this.options.update) row = bucket.shift();
+      }
+      if (!row) row = this.createRow(item, index);
+      row.item = item; next.push(row);
+    }
+    this.rows = next;
+    this.removeRows([...available.values()].flat());
+    this.layout();
+  }
+  private apply(changes: ChangeSet<T>): void {
+    for (const change of changes) {
+      if (change.Reason === 'reset') { this.reconcile(change.Items); continue; }
+      if (change.Reason === 'add') this.rows.splice(change.Index, 0, ...change.Items.map((item, index) => this.createRow(item, change.Index + index)));
+      else if (change.Reason === 'remove') this.removeRows(this.rows.splice(change.Index, change.Items.length));
+      else if (change.Reason === 'move') this.rows.splice(change.Index, 0, ...this.rows.splice(change.PreviousIndex!, change.Items.length));
+      else if (change.Reason === 'replace') {
+        const old = this.rows.splice(change.Index, change.PreviousItems?.length ?? change.Items.length);
+        const next = change.Items.map((item, index) => {
+          const key = this.options.keySelector ? this.options.keySelector(item) : item;
+          const match = old.findIndex(row => Object.is(row.key, key) && (Object.is(row.item, item) || !!this.options.update));
+          const row = match < 0 ? this.createRow(item, change.Index + index) : old.splice(match, 1)[0]!;
+          row.item = item; return row;
+        });
+        this.rows.splice(change.Index, 0, ...next); this.removeRows(old);
+      }
+    }
+    this.layout();
+  }
+  private layout(): void {
+    // Work backwards: insertBefore moves existing nodes without remounting them.
+    let reference: Node = this.anchor;
+    for (let index = this.rows.length - 1; index >= 0; index--) {
+      const row = this.rows[index]!;
+      if (row.node.nextSibling !== reference || row.node.parentNode !== this.Element) this.Element.insertBefore(row.node, reference);
+      this.options.update?.(row.node, row.item, index, row.lifetime); reference = row.node;
+    }
+  }
+  private connect(): void {
+    const lifetime = new CompositeDisposable(); this.connection.Disposable = lifetime;
+    const generation = ++this.generation;
+    const source = this.source;
+    const binding = 'ItemsChanged' in source ? undefined : ToReactiveCollection(source as DynamicDataSource<T, K>);
+    if (binding) lifetime.Add(binding);
+    const collection = (binding?.Collection ?? source) as ReactiveCollectionSource<T>;
+    let subscribing = true, failed = false, initialError: unknown;
+    const fail = (error: unknown) => {
+      if (generation !== this.generation) return;
+      lifetime.Dispose(); this.clearRows();
+      if (this.options.onError) this.options.onError(error);
+      else if (subscribing) { failed = true; initialError = error; }
+      else throw error;
+    };
+    if (collection.Connect) {
+      // The atomic initial reset excludes a batch already reflected in the current snapshot.
+      lifetime.Add(collection.Connect().subscribe({ next: changes => { try { this.run(() => { if (generation === this.generation) this.apply(changes); }); } catch (error) { fail(error); } }, error: fail }));
+    } else lifetime.Add(collection.ItemsChanged.subscribe({ next: items => { try { this.run(() => { if (generation === this.generation) this.reconcile(items); }); } catch (error) { fail(error); } }, error: fail }));
+    if (binding) lifetime.Add(binding.Errors.subscribe(fail));
+    subscribing = false;
+    if (failed) throw initialError;
+  }
+}
+/** Binds DynamicData list/cache changes or a bindable collection to independently owned rows. */
+export function BindCollection<T, K = unknown>(source: CollectionViewSource<T, K>, element: Element, render: CollectionItemRenderer<T>, options: CollectionBindingOptions<T> = {}): ReactiveCollectionBinding<T, K> {
+  return new ReactiveCollectionBinding(source, element, render, options);
+}
+export const bindCollection = BindCollection;
+
 const invalidParts = new Set(['__proto__', 'prototype', 'constructor']);
 function pathParts(path: string): string[] {
   const parts = path.split('.');

@@ -17,3 +17,6 @@ export * from './providers.js';
 export * from './builder.js';
 export * from './scheduled-subject.js';
 export * from './observable-extensions.js';
+
+export { ToDynamicDataChangeSet, ToObservableChangeSet, ConnectDynamicData, ApplyDynamicDataChanges, BindChangeSet, ToReactiveCollection, DynamicData } from './dynamic-data.js';
+export type { DynamicDataSource, IChangeSetBinding } from './dynamic-data.js';

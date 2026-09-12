@@ -1,6 +1,6 @@
 {
   "name": "@wieslawsoltes/reactiveweb",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "RxJS MVVM for JavaScript, HTML and React with ReactiveUI-style .NET APIs",
   "type": "module",
   "license": "MIT",
@@ -40,6 +40,11 @@
       "types": "./dist/generator-cli.d.ts",
       "import": "./dist/generator-cli.js",
       "require": "./dist/cjs/generator-cli.js"
+    },
+    "./dynamic-data": {
+      "types": "./dist/dynamic-data.d.ts",
+      "import": "./dist/dynamic-data.js",
+      "require": "./dist/cjs/dynamic-data.js"
     }
   },
   "bin": {
@@ -57,7 +62,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "keywords": [
     "rxjs",
@@ -107,5 +112,8 @@
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "dependencies": {
+    "@wieslawsoltes/dynamicdataweb": "^0.1.1"
   }
 }

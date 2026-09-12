@@ -17,3 +17,12 @@ and licenses/RXJS-LICENSE.txt within the showcase.
 The showcase additionally bundles React and React DOM, MIT licensed,
 Copyright (c) Meta Platforms, Inc. and affiliates.
 Their licenses are included alongside the built showcase.
+
+DynamicDataWeb integration
+--------------------------
+ReactiveWeb uses @wieslawsoltes/dynamicdataweb, an independent MIT-licensed web
+adaptation of DynamicData (Copyright (c) Roland Pheasant 2011-2022).
+The npm package retains DynamicDataWeb as an external dependency; standalone
+browser distributions include its code. See third-party/DYNAMICDATA-LICENSE.txt
+and third-party/DYNAMICDATA-NOTICE.txt in the browser distribution, or the
+licenses directory in the showcase, for the retained attribution.

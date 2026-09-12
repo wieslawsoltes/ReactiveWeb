@@ -23,7 +23,7 @@ try {
   assert.equal(packResult[0].version, packageJson.version, 'Tarball version must match the checked-out source');
   const tarball = join(temporary, packResult[0].filename);
   const packedFiles = new Set(packResult[0].files.map(file => file.path));
-  for (const file of ['dist/index.js', 'dist/index.d.ts', 'dist/cjs/index.js', 'dist/cjs/package.json', 'dist/generator-cli.js', 'dist/react.js', 'dist/html.js', 'dist/generation.js', 'src/index.ts', 'docs/generation.md', 'examples/generation/counter.schema.json']) {
+  for (const file of ['dist/index.js', 'dist/index.d.ts', 'dist/cjs/index.js', 'dist/cjs/package.json', 'dist/generator-cli.js', 'dist/react.js', 'dist/html.js', 'dist/generation.js', 'dist/dynamic-data.js', 'dist/dynamic-data.d.ts', 'dist/third-party/DYNAMICDATA-LICENSE.txt', 'src/index.ts', 'docs/generation.md', 'examples/generation/counter.schema.json']) {
     assert(packedFiles.has(file), `Published tarball is missing ${file}`);
   }
   for (const file of packedFiles) assert(!file.startsWith('node_modules/') && !file.startsWith('test-results/'), `Unexpected package file: ${file}`);
@@ -31,8 +31,9 @@ try {
   const consumer = join(temporary, 'consumer');
   await mkdir(consumer);
   await writeFile(join(consumer, 'package.json'), JSON.stringify({ name: 'reactiveweb-package-smoke', version: '1.0.0', private: true, type: 'module' }));
-  run(npm, ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--package-lock=false', '--legacy-peer-deps', tarball], consumer, 'isolated local-tarball installation');
-  // Peers remain external and use the caller's installation. No network is needed.
+  // Resolve the real published DynamicData dependency even on a runner with an empty npm cache.
+  run(npm, ['install', '--registry=https://registry.npmjs.org', '--ignore-scripts', '--no-audit', '--no-fund', '--package-lock=false', '--legacy-peer-deps', tarball], consumer, 'isolated local-tarball installation');
+  // Peers remain external and use the caller's installation.
   for (const dependency of ['rxjs', 'react', '@types/node', '@types/react']) {
     const destination = join(consumer, 'node_modules', dependency);
     await mkdir(dirname(destination), { recursive: true });
@@ -46,6 +47,8 @@ import * as html from ${JSON.stringify(importName + '/html')};
 import * as react from ${JSON.stringify(importName + '/react')};
 import * as generation from ${JSON.stringify(importName + '/generation')};
 import * as generator from ${JSON.stringify(importName + '/generator')};
+import * as integration from ${JSON.stringify(importName + '/dynamic-data')};
+import * as dd from '@wieslawsoltes/dynamicdataweb';
 import { Observable, firstValueFrom, map } from 'rxjs';
 assert.equal(typeof html.ReactiveElement, 'function');
 assert.equal(typeof react.useObservable, 'function');
@@ -59,6 +62,16 @@ assert(vm.Changed instanceof Observable, 'RxJS must remain an external peer');
 assert(vm.Add.Execute(2) instanceof Observable, 'Commands return peer RxJS observables');
 assert.equal(await firstValueFrom(vm.Add.Execute(2)), 5);
 assert.equal(vm.Double, 10);
+assert.equal(integration.DynamicData.SourceCache, dd.SourceCache, 'DynamicData uses the installed external package');
+assert.equal(core.DynamicData.SourceCache, dd.SourceCache, 'Root and adapter share DynamicData class identity');
+const cache = new dd.SourceCache(() => 'counter');
+const binding = integration.BindChangeSet(cache.Connect().pipe(dd.AutoRefresh('Count'), dd.Filter(item => item.Count >= 10)));
+cache.AddOrUpdate(vm);
+assert.equal(binding.Collection.Count, 0);
+vm.Count = 12;
+assert.equal(binding.Collection.Count, 1);
+assert.equal(binding.Collection.GetAt(0), vm);
+binding.Dispose(); cache.Dispose();
 vm.Dispose();
 console.log('ESM package entries, class identity, and external RxJS: passed');
 `;
@@ -69,6 +82,10 @@ const html = require(${JSON.stringify(importName + '/html')});
 const react = require(${JSON.stringify(importName + '/react')});
 const generation = require(${JSON.stringify(importName + '/generation')});
 const generator = require(${JSON.stringify(importName + '/generator')});
+const integration = require(${JSON.stringify(importName + '/dynamic-data')});
+const dd = require('@wieslawsoltes/dynamicdataweb');
+assert.equal(core.DynamicData.SourceList, dd.SourceList);
+assert.equal(integration.DynamicData.SourceCache, dd.SourceCache);
 const { Observable, firstValueFrom } = require('rxjs');
 assert.equal(typeof html.ReactiveElement, 'function');
 assert.equal(typeof react.useObservable, 'function');
@@ -87,6 +104,12 @@ firstValueFrom(vm.Add.Execute(2)).then(value => { assert.equal(value, 5); vm.Dis
   process.stdout.write(run(process.execPath, ['commonjs.cjs'], consumer, 'CommonJS package consumer'));
 
   const typed = `
+import { DynamicData, BindChangeSet } from ${JSON.stringify(importName + '/dynamic-data')};
+const sourceCache = new DynamicData.SourceCache<{ Id: number; Score: number }, number>(item => item.Id);
+const collectionBinding = BindChangeSet(sourceCache.Connect().pipe(DynamicData.Filter(item => item.Score > 0)));
+const collectionItem: { Id: number; Score: number } = collectionBinding.Collection.GetAt(0);
+void collectionItem;
+collectionBinding.Dispose(); sourceCache.Dispose();
 import { ReactiveObject, ReactiveCommand, Reactive } from ${JSON.stringify(importName)};
 import { defineViewModel, reactiveProperty } from ${JSON.stringify(importName + '/generation')};
 import { ReactiveElement } from ${JSON.stringify(importName + '/html')};

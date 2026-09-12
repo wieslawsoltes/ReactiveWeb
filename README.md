@@ -18,7 +18,7 @@ from HTML and optional React adapters. Reactive properties can be explicit
 accessors, standard TypeScript accessor decorators, schema-generated classes, or
 readable source produced at build time.
 
-This is an independent MIT-licensed implementation. **Version 0.1.1 implements the
+This is an independent MIT-licensed implementation. **Version 0.2.0 implements the
 documented browser MVVM surface; it does not claim exhaustive API or behavioral
 equivalence to every ReactiveUI package and native platform.** See the pinned
 [upstream audit](docs/upstream-audit.md) and detailed [mapping](docs/compatibility.md).
@@ -51,7 +51,7 @@ npm install react react-dom
 Every versioned GitHub release also contains an npm-compatible `.tgz`:
 
 ```sh
-npm install ./wieslawsoltes-reactiveweb-0.1.1.tgz rxjs
+npm install ./wieslawsoltes-reactiveweb-0.2.0.tgz rxjs
 ```
 
 The release pipeline publishes the same verified package to npmjs and GitHub
@@ -66,6 +66,7 @@ configuration. See [publishing](docs/publishing.md) for release and credential s
 | `@wieslawsoltes/reactiveweb/html` | DOM bindings, reactive custom elements and view hosts |
 | `@wieslawsoltes/reactiveweb/react` | React hooks, contexts and view hosts; React is optional |
 | `@wieslawsoltes/reactiveweb/generation` | Decorators and typed runtime schema generation |
+| `@wieslawsoltes/reactiveweb/dynamic-data` | Full `DynamicData` namespace and collection/change-set adapters |
 | `@wieslawsoltes/reactiveweb/generator` | Node-only source-generator API |
 
 The package contains ESM, CommonJS, declarations, source maps and original source.
@@ -245,7 +246,7 @@ See [generation](docs/generation.md) and [compilable examples](examples/generati
 | Interactions | Typed input/output, newest-first handlers, async/Observable handlers, cancellation and unhandled errors |
 | Routing | Navigation stack, navigate/back/reset commands, view locator contracts, HTML and React hosts, enter/leave resource scopes |
 | Validation | Property and stream validation, async obsolete-result cancellation, aggregate pending/errors, command gating |
-| Collections | Observable list changes, transactional batches/rollback, live filtering/sorting, ordered comparers, per-object resource ownership |
+| Collections | DynamicDataWeb list/cache pipelines, property refresh, incremental collection binding, filtering/sorting/paging, HTML/React views and per-object resource ownership |
 | Services and messages | Factory/constant/lazy-singleton registrations, contracts, reversible registrations, live/latest typed message channels |
 | Persistence | Suspension lifecycle, memory/localStorage drivers, JSON migration hooks, serial saves, AutoPersist/AutoPersistCollection |
 | Setup and conversion | `RxAppBuilder`, modular facades, property-provider registration, affinity-based converters, binding hooks |
@@ -301,8 +302,10 @@ JavaScript cannot preserve CLR binary interfaces, C# overload resolution,
 expression-tree semantics, Roslyn diagnostics, native control hierarchies, or
 operating-system suspension guarantees. Explicit tokens replace erased runtime
 generic types, member paths replace expression trees, and web lifecycle adapters
-replace native UI integrations. The full DynamicData operator surface is a separate
-project; this package implements the documented collection helpers.
+replace native UI integrations. DynamicData collection pipelines are provided by the published
+`@wieslawsoltes/dynamicdataweb` dependency and integrated with ReactiveWeb models,
+collections, persistence, HTML and React. Its own overload and platform adaptations
+remain documented in the [DynamicData integration guide](docs/dynamic-data.md).
 
 The suite verifies the cases named in its tests. It is not an exhaustive upstream
 differential conformance suite, production-scale soak test, or all-browser

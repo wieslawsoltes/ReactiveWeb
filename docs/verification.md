@@ -61,3 +61,17 @@ Native .NET and Roslyn APIs are mapped or explicitly excluded in
 [compatibility.md](compatibility.md), rather than counted as verified browser
 features. Task/Promise cancellation requires cooperation and browser unload cannot
 guarantee completion of asynchronous persistence.
+
+## DynamicData integration (0.2.0)
+
+The integration suite verifies legacy/native list changes, indexed duplicates,
+cache keys and updates, property refresh, dynamic filtering/ordering, stable item
+subscriptions, per-object lifetimes, persistence cancellation, atomic rollback,
+empty sources, finite snapshots, reentrant subscription and terminal ordering.
+HTML and React tests cover node retention, row cleanup, duplicate occurrences,
+source replacement, StrictMode, SSR and synchronous completion. The browser
+showcase check exercises a shared cache through both UI adapters.
+
+Installed package consumers verify the `./dynamic-data` entry from ESM and
+CommonJS, shared DynamicData class/RxJS identity, native ReactiveObject refresh and
+strictly typed cache pipelines. Standalone assets retain the DynamicData license.
