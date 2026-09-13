@@ -1,0 +1,31 @@
+@namespace ReactiveWeb.Blazor
+@using Microsoft.AspNetCore.Components
+@typeparam TValue
+@implements IAsyncDisposable
+@if (_loaded) { @ChildContent?.Invoke(_value) } else { @Loading }
+@code {
+    [Parameter, EditorRequired] public ReactiveModel Model { get; set; } = default!;
+    [Parameter, EditorRequired] public string Property { get; set; } = "";
+    [Parameter] public RenderFragment<TValue>? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Loading { get; set; }
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private ReactiveModel? _model;
+    private string? _property;
+    private BrowserSubscription? _subscription;
+    private TValue _value = default!;
+    private bool _loaded, _disposed;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (_disposed || (ReferenceEquals(Model, _model) && Property == _property)) return;
+            if (_subscription is not null) await _subscription.DisposeAsync();
+            _model = Model; _property = Property; _loaded = false;
+            _subscription = await Model.ObserveAsync<TValue>(Property, value => _disposed ? Task.CompletedTask : InvokeAsync(async () => { _value = value; _loaded = true; await ValueChanged.InvokeAsync(value); StateHasChanged(); }));
+        }
+        finally { _gate.Release(); }
+    }
+    public async ValueTask DisposeAsync() { _disposed = true; await _gate.WaitAsync(); try { if (_subscription is not null) await _subscription.DisposeAsync(); } finally { _gate.Release(); } }
+}

@@ -1,0 +1,40 @@
+@namespace ReactiveWeb.Blazor
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@typeparam TInput
+@typeparam TOutput
+@implements IAsyncDisposable
+<button @attributes="AdditionalAttributes" disabled="@(!_canExecute || _busy)" @onclick="Execute">@ChildContent</button>
+@code {
+    [Parameter, EditorRequired] public BrowserCommand<TInput, TOutput> Command { get; set; } = default!;
+    [Parameter] public TInput Parameter { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback<TOutput> Executed { get; set; }
+    [Parameter] public EventCallback<Exception> Error { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private BrowserCommand<TInput, TOutput>? _command;
+    private BrowserSubscription? _subscription;
+    private bool _canExecute, _busy, _disposed;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (_disposed || ReferenceEquals(_command, Command)) return;
+            if (_subscription is not null) await _subscription.DisposeAsync();
+            _command = Command;
+            _subscription = await Command.ObserveCanExecuteAsync(value => _disposed ? Task.CompletedTask : InvokeAsync(() => { _canExecute = value; StateHasChanged(); }));
+        }
+        finally { _gate.Release(); }
+    }
+    private async Task Execute()
+    {
+        if (_disposed || _busy || !_canExecute) return;
+        _busy = true;
+        try { var result = await Command.ExecuteAsync(Parameter); if (!_disposed) await Executed.InvokeAsync(result); }
+        catch (Exception error) when (Error.HasDelegate) { if (!_disposed) await Error.InvokeAsync(error); }
+        finally { _busy = false; }
+    }
+    public async ValueTask DisposeAsync() { _disposed = true; await _gate.WaitAsync(); try { if (_subscription is not null) await _subscription.DisposeAsync(); } finally { _gate.Release(); } }
+}

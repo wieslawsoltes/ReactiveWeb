@@ -1,0 +1,58 @@
+@page "/"
+@namespace ReactiveWeb.Blazor.Sample
+@using ReactiveWeb.Blazor
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+<main>
+    <h1>ReactiveWeb + Blazor</h1>
+    <p>Live native property observation and a native ReactiveCommand invoking an asynchronous .NET callback.</p>
+    <button id="action" @onclick="Exercise" disabled="@(!_ready)">Execute command and verify reactive notification</button>
+    <button id="toggle" @onclick="Toggle">@(_show ? "Unmount" : "Mount")</button>
+    @if (_show) {
+        <ReactiveProvider Ready="Initialize"><ChildContent Context="runtime">
+            @if (_model is not null && _command is not null) {
+                <ReactiveValue TValue="int" Model="_model" Property="count"><ChildContent Context="count"><p>Live count: <strong>@count</strong></p></ChildContent></ReactiveValue>
+                <ReactiveCommandButton TInput="int" TOutput="int" Command="_command" Parameter="_count" Executed="ApplyResult">Increment through command binding</ReactiveCommandButton>
+            }
+        </ChildContent></ReactiveProvider>
+    }
+    <output id="status">@_status</output><output id="result">@_result</output>
+</main>
+@code {
+    private ReactiveModel? _model;
+    private BrowserCommand<int, int>? _command;
+    private BrowserSubscription? _observation;
+    private DotNetObjectReference<Demo>? _reference;
+    private TaskCompletionSource<int>? _notification;
+    private bool _show = true, _ready;
+    private int _count;
+    private string _status = "Loading", _result = "";
+    private async Task Initialize(BrowserModule module)
+    {
+        _count = 1; _model = await ReactiveModel.CreateAsync(module, new { count = _count });
+        _reference = DotNetObjectReference.Create(this);
+        _command = await BrowserCommand<int, int>.CreateAsync(module, BrowserFunction.DotNet(_reference, nameof(Increment)));
+        _observation = await _model.ObserveAsync<int>("count", value => { _notification?.TrySetResult(value); return Task.CompletedTask; });
+        _ready = true; _status = "Ready";
+    }
+    [JSInvokable] public Task<int> Increment(int value) => Task.FromResult(value + 1);
+    private async Task ApplyResult(int value) { _count = value; await _model!.SetAsync("count", value); }
+    private async Task Exercise()
+    {
+        _notification = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expected = _count + 1; var result = await _command!.ExecuteAsync(_count); await ApplyResult(result);
+        if (result != expected || await _notification.Task.WaitAsync(TimeSpan.FromSeconds(15)) != expected || await _model!.GetAsync<int>("count") != expected) throw new InvalidOperationException("Native command or reactive value propagation failed.");
+        await _command.SetEnabledAsync(false); if (await _command.GetCanExecuteAsync()) throw new InvalidOperationException("CanExecute gating failed.");
+        await _command.SetEnabledAsync(true); _result = "Passed";
+    }
+    private async Task Cleanup()
+    {
+        if (_observation is not null) { await _observation.DisposeAsync(); _observation = null; }
+        if (_command is not null) { await _command.DisposeAsync(); _command = null; }
+        if (_model is not null) { await _model.DisposeAsync(); _model = null; }
+        _reference?.Dispose(); _reference = null;
+    }
+    private async Task Toggle() { _ready = false; if (_show) await Cleanup(); _show = !_show; _status = _show ? "Loading" : "Unmounted"; _result = ""; }
+    public async ValueTask DisposeAsync() { await Cleanup(); }
+}
