@@ -31,19 +31,19 @@ public abstract class ReactiveResource(BrowserModule module, IJSObjectReference 
 public sealed class ReactiveModel : ReactiveResource
 {
     private ReactiveModel(BrowserModule module, IJSObjectReference handle) : base(module, handle) { }
-    public static async ValueTask<ReactiveModel> CreateAsync(BrowserModule module, object? values = null) => new(module, await module.CreateAsync("ReactiveObject", [values ?? new { }]));
-    public ValueTask<T> GetAsync<T>(string property) => Module.CallAsync<T>(Handle, "GetValue", [property]);
-    public ValueTask SetAsync<T>(string property, T value) => Module.CallVoidAsync(Handle, "SetValue", [property, value]);
-    public ValueTask SetManyAsync(object values) => Module.InvokeVoidAsync("SetReactiveValues", [Handle, values]);
+    public static async ValueTask<ReactiveModel> CreateAsync(BrowserModule module, object? values = null) => new(module, await module.CreateAsync("ReactiveObject", [BrowserValue.Literal(values ?? new { })]));
+    public ValueTask<T> GetAsync<T>(string property) => Module.CallJsonAsync<T>(Handle, "GetValue", [property]);
+    public ValueTask SetAsync<T>(string property, T value) => Module.CallVoidAsync(Handle, "SetValue", [property, BrowserValue.Literal(value)]);
+    public ValueTask SetManyAsync(object values) => Module.InvokeVoidAsync("SetReactiveValues", [Handle, BrowserValue.Literal(values)]);
     public async ValueTask<BrowserSubscription> ObserveAsync<T>(string path, Func<T, Task> next, Func<JsonElement, Task>? error = null)
     {
         await using var observable = await Module.InvokeAsync<IJSObjectReference>("ObserveReactiveValue", [Handle, path]);
-        return await Module.SubscribeAsync(observable, "", notification => Dispatch(notification, next, error));
+        return await Module.SubscribeJsonAsync<JsonElement>(observable, "", notification => Dispatch(notification, next, error));
     }
     public async ValueTask<BrowserSubscription> ObserveChangesAsync(Func<JsonElement, Task> next)
     {
         await using var observable = await Module.InvokeAsync<IJSObjectReference>("ObserveReactiveChanges", [Handle]);
-        return await Module.SubscribeAsync(observable, "", next);
+        return await Module.SubscribeJsonAsync<JsonElement>(observable, "", next);
     }
 }
 public sealed class BrowserCommand<TInput, TOutput> : ReactiveResource
@@ -57,15 +57,15 @@ public sealed class BrowserCommand<TInput, TOutput> : ReactiveResource
     public async ValueTask<TOutput> ExecuteAsync(TInput input, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        try { return await Module.CallAsync<TOutput>(Handle, "ExecuteAsync", [input], cancellationToken); }
+        try { return await Module.CallJsonAsync<TOutput>(Handle, "ExecuteAsync", [BrowserValue.Literal(input)], cancellationToken); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             try { await CancelAsync(); } catch (JSDisconnectedException) { } catch (ObjectDisposedException) { }
             throw;
         }
     }
-    public ValueTask<BrowserSubscription> ObserveCanExecuteAsync(Func<bool, Task> next) => Module.SubscribeAsync(Handle, "CanExecute", value => value.ValueKind is JsonValueKind.True or JsonValueKind.False ? next(value.GetBoolean()) : Task.CompletedTask);
-    public ValueTask<BrowserSubscription> ObserveExecutingAsync(Func<bool, Task> next) => Module.SubscribeAsync(Handle, "IsExecuting", value => value.ValueKind is JsonValueKind.True or JsonValueKind.False ? next(value.GetBoolean()) : Task.CompletedTask);
-    public ValueTask<BrowserSubscription> ObserveResultsAsync(Func<TOutput, Task> next, Func<JsonElement, Task>? error = null) => Module.SubscribeAsync(Handle, "Results", notification => Dispatch(notification, next, error));
-    public ValueTask<BrowserSubscription> ObserveErrorsAsync(Func<JsonElement, Task> next) => Module.SubscribeAsync(Handle, "ThrownExceptions", next);
+    public ValueTask<BrowserSubscription> ObserveCanExecuteAsync(Func<bool, Task> next) => Module.SubscribeJsonAsync<JsonElement>(Handle, "CanExecute", value => value.ValueKind is JsonValueKind.True or JsonValueKind.False ? next(value.GetBoolean()) : Task.CompletedTask);
+    public ValueTask<BrowserSubscription> ObserveExecutingAsync(Func<bool, Task> next) => Module.SubscribeJsonAsync<JsonElement>(Handle, "IsExecuting", value => value.ValueKind is JsonValueKind.True or JsonValueKind.False ? next(value.GetBoolean()) : Task.CompletedTask);
+    public ValueTask<BrowserSubscription> ObserveResultsAsync(Func<TOutput, Task> next, Func<JsonElement, Task>? error = null) => Module.SubscribeJsonAsync<JsonElement>(Handle, "Results", notification => Dispatch(notification, next, error));
+    public ValueTask<BrowserSubscription> ObserveErrorsAsync(Func<JsonElement, Task> next) => Module.SubscribeJsonAsync<JsonElement>(Handle, "ThrownExceptions", next);
 }
