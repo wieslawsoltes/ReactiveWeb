@@ -1,10 +1,7 @@
-# ReactiveWeb.Blazor 0.3.1
+# ReactiveWeb.Blazor 0.3.2
 
-Updates the pinned interop runtime to tested Dockyard revision `1c895b7184451071e1c7131063249d2d9eb145b9`, with no Dockyard runtime dependency.
+Adopts merged and validated shared runtime c833be49d472583b6f56225862e0aa7d201c1da7 from Dockyard PR #5. Fixes concurrent visual cleanup, late template imports/root creation, queued callbacks after removal and retained failures. Adds lifecycle state, awaitable Razor factory disposal and coalesced parameter updates.
 
-- Await concurrent native/module/subscription cleanup and asynchronous unsubscribe, continuing teardown after individual failures.
-- Preserve cyclic/deep argument graphs, shared callback identity and callable property/method/disposal access.
-- Cancel initialization waits independently without cancelling shared initialization; prevent late work after owner disposal.
-- Add `CallFunctionJsonAsync<T>` for complete streamed callable results and expanded JavaScript/managed regressions.
+Typed reactive models, asynchronous commands, full DTO notifications, Razor value/command components and native operator access remain intact. Root and package READMEs and release notes identify 0.3.2. The shared source introduces no Dockyard runtime dependency.
 
-Typed reactive models, asynchronous native commands, Razor value/command components, complete DTO notifications and all native APIs remain available. Both .NET 8/.NET 10 WebAssembly and Server package consumers validate real native commands, property changes, CanExecute, streaming and Razor callbacks before publication. Public NuGet payloads are verified before creating the release. Native compatibility and asynchronous callback constraints are unchanged.
+Both .NET 8/.NET 10 actual-package WebAssembly/Server matrices run new managed visual/template lifecycle regressions and template movement/update/recreation, alongside native command/reactive checks and eight new shared JavaScript cases. Publication verifies the public NuGet payload before releasing packages, symbols and runnable samples. Synchronous native callbacks remain browser functions; engine boundaries are unchanged.
