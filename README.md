@@ -4,7 +4,7 @@ RxJS MVVM for JavaScript, HTML, React and Blazor with ReactiveUI-style .NET APIs
 
 [![npm](https://img.shields.io/npm/v/%40wieslawsoltes%2Freactiveweb)](https://www.npmjs.com/package/@wieslawsoltes/reactiveweb)
 [![npm downloads](https://img.shields.io/npm/dm/%40wieslawsoltes%2Freactiveweb)](https://www.npmjs.com/package/@wieslawsoltes/reactiveweb)
-[![NuGet](https://img.shields.io/nuget/v/ReactiveWeb.Blazor)](https://www.nuget.org/packages/ReactiveWeb.Blazor)
+[![ReactiveWeb.Blazor on NuGet](https://img.shields.io/nuget/v/ReactiveWeb.Blazor?label=ReactiveWeb.Blazor&logo=nuget)](https://www.nuget.org/packages/ReactiveWeb.Blazor)
 [![NuGet downloads](https://img.shields.io/nuget/dt/ReactiveWeb.Blazor)](https://www.nuget.org/packages/ReactiveWeb.Blazor)
 [![Blazor CI](https://github.com/wieslawsoltes/ReactiveWeb/actions/workflows/blazor.yml/badge.svg)](https://github.com/wieslawsoltes/ReactiveWeb/actions/workflows/blazor.yml)
 
