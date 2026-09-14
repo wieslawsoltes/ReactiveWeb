@@ -19,7 +19,7 @@ The [complete JavaScript guide](README.web.md) preserves the existing API exampl
 ## Blazor
 
 ```sh
-dotnet add package ReactiveWeb.Blazor --version 0.3.1
+dotnet add package ReactiveWeb.Blazor --version 0.3.2
 ```
 
 The .NET 8/.NET 10 package supports interactive WebAssembly and Server. It includes the native engine and RxJS as local static web assets, typed reactive models and asynchronous commands, `ReactiveProvider`, `ReactiveValue<TValue>` and `ReactiveCommandButton<TInput,TOutput>`. Native object/function handles expose advanced operators. Consumers need neither npm nor a CDN.
