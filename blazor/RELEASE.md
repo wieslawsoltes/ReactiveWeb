@@ -1,9 +1,10 @@
-# ReactiveWeb.Blazor 0.3.0
+# ReactiveWeb.Blazor 0.3.1
 
-- .NET 8/.NET 10 package with native reactive engine, HTML adapter and RxJS browser assets.
-- Typed model services and command wrappers, reactive Razor values/buttons, CanExecute, execution/error observation and cancellation.
-- Full streamed DTO values/results/notifications, literal application arguments and native returned-function handles for advanced operators.
-- Scoped template roots, shared lifecycle cleanup, real WebAssembly/Server package-consumer samples and regression tests.
-- Root documentation, independent NuGet publication, verified public payloads, symbols and runnable sample archives.
+Updates the pinned interop runtime to tested Dockyard revision `1c895b7184451071e1c7131063249d2d9eb145b9`, with no Dockyard runtime dependency.
 
-Native compatibility boundaries remain applicable. Synchronous engine callbacks stay in JavaScript; asynchronous .NET command callbacks are supported where the native API accepts promises. Generic interop complements typed helpers, not an exhaustive C# port.
+- Await concurrent native/module/subscription cleanup and asynchronous unsubscribe, continuing teardown after individual failures.
+- Preserve cyclic/deep argument graphs, shared callback identity and callable property/method/disposal access.
+- Cancel initialization waits independently without cancelling shared initialization; prevent late work after owner disposal.
+- Add `CallFunctionJsonAsync<T>` for complete streamed callable results and expanded JavaScript/managed regressions.
+
+Typed reactive models, asynchronous native commands, Razor value/command components, complete DTO notifications and all native APIs remain available. Both .NET 8/.NET 10 WebAssembly and Server package consumers validate real native commands, property changes, CanExecute, streaming and Razor callbacks before publication. Public NuGet payloads are verified before creating the release. Native compatibility and asynchronous callback constraints are unchanged.

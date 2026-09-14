@@ -1,6 +1,6 @@
 # ReactiveWeb.Blazor
 
-Install `ReactiveWeb.Blazor` 0.3.0 for .NET 8/.NET 10. The actual engine, HTML adapter, RxJS and browser dependencies are packaged as local static web assets for interactive WebAssembly and Server.
+Install `ReactiveWeb.Blazor` 0.3.1 for .NET 8/.NET 10. The actual engine, HTML adapter, RxJS and browser dependencies are packaged as local static web assets for interactive WebAssembly and Server.
 
 ## Typed model and command binding
 
